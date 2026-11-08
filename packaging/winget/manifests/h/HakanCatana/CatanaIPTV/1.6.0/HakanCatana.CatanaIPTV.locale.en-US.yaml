@@ -1,0 +1,24 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.9.0.schema.json
+PackageIdentifier: HakanCatana.CatanaIPTV
+PackageVersion: 1.6.0
+PackageLocale: en-US
+Publisher: Mustafa Hakan Çatana
+PublisherUrl: https://github.com/hakancatana
+PublisherSupportUrl: https://github.com/hakancatana/catana-iptv/issues
+PackageName: Catana IPTV
+PackageUrl: https://github.com/hakancatana/catana-iptv
+License: MIT
+LicenseUrl: https://github.com/hakancatana/catana-iptv/blob/main/LICENSE
+ShortDescription: Desktop IPTV player for Xtream Codes and M3U playlists.
+Description: Live TV with rewind, TV guide, movies and series, multi-view, TV/remote mode and 9 languages. Catana IPTV is a player only and does not provide any content.
+Moniker: catana-iptv
+Tags:
+  - iptv
+  - xtream-codes
+  - m3u
+  - epg
+  - tv
+  - video-player
+ReleaseNotesUrl: https://github.com/hakancatana/catana-iptv/releases/tag/v1.6.0
+ManifestType: defaultLocale
+ManifestVersion: 1.9.0
