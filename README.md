@@ -77,7 +77,7 @@ On Linux, passwords are encrypted with the system keyring (GNOME Keyring / KWall
 - Hide categories you never use; hide adult categories or protect them with a 4-digit PIN
 - Account details (expiry, connection limit), device check (latency, speed, codec support)
 
-**9 languages** — English, Deutsch, Français, Español, Italiano, Turkish, Русский, 简体中文, हिन्दी
+**9 languages** — English, Deutsch, Français, Español, Italiano, Türkçe, Русский, 简体中文, हिन्दी
 
 ## Screenshots
 
