@@ -11,9 +11,16 @@ app.commandLine.appendSwitch('enable-blink-features', 'AudioVideoTracks');
 app.commandLine.appendSwitch('mse-video-buffer-size-limit-mb', '1500');
 app.commandLine.appendSwitch('mse-audio-buffer-size-limit-mb', '120');
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+// Ubuntu 24.04+ AppArmor, AppImage içindeki Chromium korumalı alanını engelliyor; .deb/.rpm kurulumlarında gerek yok
+if (process.platform === 'linux' && process.env.APPIMAGE) app.commandLine.appendSwitch('no-sandbox');
 
 // ---- şifreleme (Windows: DPAPI, macOS: Anahtar Zinciri)
-ipcMain.on('crypto:available', (e) => { e.returnValue = safeStorage.isEncryptionAvailable(); });
+ipcMain.on('crypto:available', (e) => {
+  let ok = safeStorage.isEncryptionAvailable();
+  // Linux'ta anahtar zinciri yoksa Electron sabit anahtarla "şifreler"; bunu gerçek şifreleme saymıyoruz
+  if (ok && process.platform === 'linux') { try { ok = safeStorage.getSelectedStorageBackend() !== 'basic_text'; } catch { ok = false; } }
+  e.returnValue = ok;
+});
 ipcMain.on('crypto:encrypt', (e, text) => {
   try { e.returnValue = safeStorage.encryptString(String(text)).toString('base64'); } catch { e.returnValue = null; }
 });

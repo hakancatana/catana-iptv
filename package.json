@@ -1,15 +1,19 @@
 {
   "name": "catana-iptv",
   "productName": "Catana IPTV",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Catana IPTV — Xtream Codes desktop player",
   "main": "main.js",
-  "author": "MHÇ",
+  "author": {
+    "name": "Mustafa Hakan Çatana",
+    "email": "hakancatana@users.noreply.github.com"
+  },
   "license": "UNLICENSED",
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder --win nsis",
-    "dist:mac": "electron-builder --mac"
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux AppImage deb rpm"
   },
   "dependencies": {
     "hls.js": "^1.7.4",
@@ -77,6 +81,29 @@
       "identity": "-",
       "hardenedRuntime": false,
       "artifactName": "Catana-IPTV-${version}-mac-${arch}.${ext}"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb",
+        "rpm"
+      ],
+      "icon": "build/icons",
+      "category": "AudioVideo",
+      "executableName": "catana-iptv",
+      "synopsis": "Desktop IPTV player for Xtream Codes",
+      "description": "Catana IPTV is a modern desktop player for Xtream Codes IPTV with live TV, TV guide, movies and series.",
+      "maintainer": "Mustafa Hakan Çatana <hakancatana@users.noreply.github.com>",
+      "desktop": {
+        "entry": {
+          "Name": "Catana IPTV",
+          "StartupWMClass": "Catana IPTV",
+          "Keywords": "iptv;tv;xtream;video;"
+        }
+      }
+    },
+    "appImage": {
+      "artifactName": "Catana-IPTV-${version}-x86_64.${ext}"
     }
   },
   "repository": {

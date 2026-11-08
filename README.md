@@ -4,10 +4,10 @@
 
 # Catana IPTV
 
-**A clean, modern desktop player for Xtream Codes IPTV — Windows & macOS.**
+**A clean, modern desktop player for Xtream Codes IPTV — Windows, macOS & Linux.**
 
 [![Release](https://img.shields.io/github/v/release/hakancatana/catana-iptv?color=F2B33D&label=release)](https://github.com/hakancatana/catana-iptv/releases/latest)
-![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20macOS-1D222B)
+![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-1D222B)
 ![Languages](https://img.shields.io/badge/languages-9-1D222B)
 [![License](https://img.shields.io/github/license/hakancatana/catana-iptv?color=1D222B)](LICENSE)
 
@@ -26,12 +26,30 @@ Get the latest version from the **[Releases page](https://github.com/hakancatana
 | **Windows** 10 / 11 (64-bit) | `Catana-IPTV-Setup-<version>.exe` |
 | **macOS** Apple Silicon (M1–M4) | `Catana-IPTV-<version>-mac-arm64.zip` |
 | **macOS** Intel | `Catana-IPTV-<version>-mac-x64.zip` |
+| **Ubuntu / Linux Mint / Debian** (64-bit) | `catana-iptv_<version>_amd64.deb` |
+| **Fedora / RHEL / openSUSE** (64-bit) | `catana-iptv-<version>.x86_64.rpm` |
+| **Any Linux** (64-bit, no install) | `Catana-IPTV-<version>-x86_64.AppImage` |
 
-The app checks for new versions on start-up; on Windows it can download and install the update for you.
+The app checks for new versions on start-up; on Windows it can download and install the update for you, on macOS and Linux it opens the download page.
 
 > The builds are not code-signed yet.
 > **Windows:** if SmartScreen appears, click *More info → Run anyway*.
 > **macOS:** move the app to *Applications*, try to open it once, then go to *System Settings → Privacy & Security* and click *Open Anyway*.
+
+**Linux install**
+
+```bash
+# Ubuntu / Linux Mint / Debian
+sudo apt install ./catana-iptv_<version>_amd64.deb
+
+# Fedora
+sudo dnf install ./catana-iptv-<version>.x86_64.rpm
+
+# AppImage (any distribution; Ubuntu 22.04+ needs: sudo apt install libfuse2t64 — or libfuse2 on 22.04)
+chmod +x Catana-IPTV-<version>-x86_64.AppImage && ./Catana-IPTV-<version>-x86_64.AppImage
+```
+
+On Linux, passwords are encrypted with the system keyring (GNOME Keyring / KWallet) when one is available.
 
 ## Features
 
@@ -55,7 +73,7 @@ The app checks for new versions on start-up; on Windows it can download and inst
 - Keeps the screen awake while playing
 
 **Account & privacy**
-- Multiple Xtream profiles; passwords stored encrypted (Windows DPAPI / macOS Keychain)
+- Multiple Xtream profiles; passwords stored encrypted (Windows DPAPI / macOS Keychain / Linux keyring)
 - Hide categories you never use; hide adult categories or protect them with a 4-digit PIN
 - Account details (expiry, connection limit), device check (latency, speed, codec support)
 
@@ -119,6 +137,7 @@ npm install
 npm start            # run the app
 npm run dist         # Windows installer (dist/)
 npm run dist:mac     # macOS builds (best run on a Mac)
+npm run dist:linux   # AppImage, .deb and .rpm (needs rpmbuild for .rpm)
 ```
 
 Built with [Electron](https://www.electronjs.org/), [mpegts.js](https://github.com/xqq/mpegts.js) and [hls.js](https://github.com/video-dev/hls.js). No framework, no build step for the UI — plain HTML, CSS and JavaScript in [`src/`](src).
@@ -128,7 +147,7 @@ Built with [Electron](https://www.electronjs.org/), [mpegts.js](https://github.c
 1. Bump `version` in `package.json` and push to `main`.
 2. Go to **Actions → Release → Run workflow**.
 
-GitHub Actions builds the Windows installer and the macOS packages, creates the `v<version>` tag and publishes the release. Installed apps pick up the new version automatically.
+GitHub Actions builds the Windows installer, the macOS packages and the Linux packages, creates the `v<version>` tag and publishes the release. Installed apps pick up the new version automatically.
 
 ## Disclaimer
 

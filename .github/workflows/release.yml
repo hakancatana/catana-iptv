@@ -3,7 +3,7 @@ name: Release
 # Yeni sürüm çıkarmak için:
 #   1) package.json içindeki "version" değerini artır ve main'e gönder
 #   2) GitHub › Actions › Release › "Run workflow"
-# Sürüm etiketi (v1.2.3) ve sürüm sayfası otomatik oluşturulur; Windows ve macOS paketleri yüklenir.
+# Sürüm etiketi (v1.2.3) ve sürüm sayfası otomatik oluşturulur; Windows, macOS ve Linux paketleri yüklenir.
 on:
   workflow_dispatch:
   push:
@@ -39,6 +39,8 @@ jobs:
             args: --win nsis
           - os: macos-latest
             args: --mac
+          - os: ubuntu-latest
+            args: --linux AppImage deb rpm
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -46,6 +48,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Install rpm tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y rpm
       - run: npm ci
       - name: Build and upload
         run: npx electron-builder ${{ matrix.args }} --publish always
