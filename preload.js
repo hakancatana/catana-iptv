@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('native', {
   decrypt: (b64) => ipcRenderer.sendSync('crypto:decrypt', b64),
   keepAwake: (on) => ipcRenderer.send('power:keepAwake', !!on),
   openExternal: (url) => ipcRenderer.send('shell:open', url),
+  setFullScreen: (on) => ipcRenderer.send('win:fullscreen', !!on),
   platform: process.platform,
   installUpdate: (url) => ipcRenderer.invoke('update:install', url),
   onUpdateProgress: (cb) => ipcRenderer.on('update:progress', (e, p) => cb(p)),

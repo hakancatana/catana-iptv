@@ -462,3 +462,51 @@ body > .video-wrap { display: none; }
 .update-box span { font-size: 12px; color: #CFF7E0; }
 .update-box:hover { border-color: #3DD68C; }
 .p-icon.on { color: var(--accent); }
+
+.seg-tabs { display: flex; gap: 4px; padding: 4px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); }
+.seg-tabs button { flex: 1; height: 38px; border-radius: 7px; border: 0; background: transparent; color: var(--muted); }
+.seg-tabs button.active { background: #262C36; color: #fff; font-weight: 600; }
+/* rehber: yazılar sabit kanal sütununun altında kalmasın */
+.g-prog { overflow: clip; }
+.g-prog > span { position: sticky; left: 240px; width: fit-content; max-width: 100%; }
+.g-empty { position: sticky; left: 230px; right: auto; width: max-content; padding-right: 14px; }
+
+/* çoklu izleme */
+.mv-pad { display: flex; flex-direction: column; gap: 14px; height: 100%; box-sizing: border-box; }
+.mv-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.mv-warn { font-size: 12px; color: #FFD18A; }
+.mv-grid { flex: 1; min-height: 420px; display: grid; gap: 10px; }
+.mv-grid.n2 { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); }
+.mv-grid.n4 { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); }
+.mv-grid:fullscreen { background: #000; padding: 6px; gap: 6px; }
+.mv-cell { position: relative; border-radius: 12px; overflow: hidden; background: #05070A; border: 2px solid var(--line); min-height: 0; }
+.mv-cell.audio { border-color: var(--accent); }
+.mv-cell:fullscreen { border: 0; border-radius: 0; }
+.mv-cell video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; }
+.mv-cell.empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--muted); border-style: dashed; cursor: pointer; }
+.mv-cell.empty:hover { color: var(--text); border-color: #4A5363; }
+.mv-plus { font-size: 40px; line-height: 1; font-weight: 300; }
+.mv-status { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--text-2); font-size: 13px; }
+.mv-top { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 4px; padding: 8px 8px 8px 12px; background: linear-gradient(#000000B0, #00000000); }
+.mv-top .p-icon { opacity: 0; transition: opacity .15s; }
+.mv-cell:hover .mv-top .p-icon, .mv-top .p-icon:focus { opacity: 1; }
+.mv-top .p-icon { width: 34px; height: 34px; }
+.mv-top .p-icon svg { width: 16px; height: 16px; }
+.mv-name { font-weight: 600; font-size: 13px; text-shadow: 0 1px 3px #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mv-audio { position: absolute; right: 10px; bottom: 10px; width: 30px; height: 30px; border-radius: 8px; background: var(--accent); color: var(--on-accent); display: none; align-items: center; justify-content: center; }
+.mv-audio svg { width: 16px; height: 16px; }
+.mv-cell.audio .mv-audio { display: flex; }
+.pick-search { height: 44px; padding: 0 14px; border-radius: 10px; background: var(--bg); border: 1px solid #2E3542; color: var(--text); outline: none; }
+.pick-search:focus { border-color: var(--accent); }
+.pick-list { display: flex; flex-direction: column; gap: 2px; max-height: 50vh; overflow-y: auto; }
+.pick-list .row { padding: 6px 8px; }
+
+/* TV / kumanda modu */
+html.tv { zoom: 1.2; }
+html.tv :focus-visible, html.tv :focus { outline: 3px solid var(--accent); outline-offset: 3px; }
+html.tv .tile:focus, html.tv .poster:focus .poster-img, html.tv .row:focus, html.tv .g-prog:focus, html.tv .episode:focus { border-color: var(--accent); }
+html.tv .tile:focus, html.tv .poster:focus { transform: scale(1.04); transition: transform .12s; }
+html.tv .poster:focus { outline: none; }
+html.tv .poster:focus .poster-img { outline: 3px solid var(--accent); outline-offset: 2px; }
+html.tv .fav { opacity: 0; } html.tv .fav.on { opacity: 1; }
+.report-box { width: 100%; min-height: 220px; resize: vertical; padding: 12px; border-radius: 10px; background: var(--bg); border: 1px solid #2E3542; color: var(--text-2); font: 12px/1.5 ui-monospace, Consolas, monospace; }

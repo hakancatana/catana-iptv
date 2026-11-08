@@ -60,6 +60,8 @@ ipcMain.handle('update:install', async (e, url) => {
   return true;
 });
 
+ipcMain.on('win:fullscreen', (e, on) => { const w = BrowserWindow.fromWebContents(e.sender); if (w) w.setFullScreen(!!on); });
+
 ipcMain.on('shell:open', (e, url) => { if (/^https?:\/\//i.test(String(url))) shell.openExternal(url); });
 
 function createWindow() {

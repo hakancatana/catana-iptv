@@ -88,6 +88,8 @@ function loadProfiles() {
     const o = Object.assign({}, p);
     if (o.pwEnc) { const pw = NATIVE ? NATIVE.decrypt(o.pwEnc) : null; o.password = pw == null ? '' : pw; delete o.pwEnc; }
     else if (o.password) migrate = true;
+    if (o.m3uEnc) { const u = NATIVE ? NATIVE.decrypt(o.m3uEnc) : null; o.m3uUrl = u == null ? '' : u; delete o.m3uEnc; }
+    else if (o.m3uUrl) migrate = true;
     return o;
   });
   return { list, migrate };
@@ -118,6 +120,7 @@ function saveProfiles() {
   const out = S.profiles.map((p) => {
     const o = Object.assign({}, p);
     if (ENC_OK && o.password) { const enc = NATIVE.encrypt(o.password); if (enc) { o.pwEnc = enc; delete o.password; } }
+    if (ENC_OK && o.m3uUrl) { const enc = NATIVE.encrypt(o.m3uUrl); if (enc) { o.m3uEnc = enc; delete o.m3uUrl; } }
     return o;
   });
   LS.set('catana.profiles', out); LS.set('catana.activeId', S.activeId);
@@ -137,7 +140,7 @@ function toggleFav(item) {
   LS.set(favKey(), f);
   return i < 0;
 }
-const snapshot = (it) => ({ type: it.type, id: it.id, name: it.name, icon: it.icon, ext: it.ext, num: it.num, rating: it.rating, seriesId: it.seriesId });
+const snapshot = (it) => ({ type: it.type, id: it.id, name: it.name, icon: it.icon, ext: it.ext, num: it.num, rating: it.rating, seriesId: it.seriesId, url: it.url });
 function addRecent(item) {
   const r = LS.get(recentKey(), []).filter((x) => !(x.type === item.type && String(x.id) === String(item.id)));
   r.unshift(Object.assign(snapshot(item), { t: Date.now() }));
@@ -174,7 +177,58 @@ async function api(p, action, params = {}) {
   } finally { clearTimeout(timer); }
 }
 
+// ---------------- M3U listesi
+const isM3U = (p = profile()) => !!(p && p.type === 'm3u');
+const VOD_RE = /\/(movie|series)\/|\.(mp4|mkv|avi|mov|m4v|webm)$/i;
+function parseM3U(text) {
+  if (!/^\uFEFF?#EXTM3U/.test(text.trimStart())) throw new Error('Geçerli bir M3U listesi değil.');
+  const live = [], vod = [], lg = new Map(), vg = new Map();
+  let cur = null;
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (line.startsWith('#EXTINF')) {
+      const at = {}; line.replace(/([\w-]+)="([^"]*)"/g, (_, k, v) => { at[k.toLowerCase()] = v; });
+      const ci = line.lastIndexOf(',');
+      cur = { name: (ci >= 0 ? line.slice(ci + 1) : '').trim() || at['tvg-name'] || '?', logo: at['tvg-logo'] || '', group: at['group-title'] || 'Diğer' };
+    } else if (line.startsWith('#EXTGRP:') && cur) cur.group = line.slice(8).trim() || cur.group;
+    else if (!line.startsWith('#') && cur) {
+      const url = line, path = url.split('?')[0];
+      const isVod = VOD_RE.test(path);
+      const groups = isVod ? vg : lg;
+      if (!groups.has(cur.group)) groups.set(cur.group, 'g' + groups.size);
+      const cat = groups.get(cur.group);
+      if (isVod) vod.push({ name: cur.name, stream_id: 'v' + vod.length, stream_icon: cur.logo, category_id: cat, container_extension: (path.match(/\.(\w{2,4})$/) || [])[1] || 'mp4', added: 0, url });
+      else live.push({ num: live.length + 1, name: cur.name, stream_id: 'l' + live.length, stream_icon: cur.logo, category_id: cat, url });
+      cur = null;
+    }
+  }
+  vod.forEach((v, i) => { v.added = vod.length - i; });
+  if (!live.length && !vod.length) throw new Error('Listede oynatılabilir kayıt bulunamadı.');
+  const cats = (m) => [...m].map(([name, id]) => ({ category_id: id, category_name: name }));
+  return { live, vod, liveCats: cats(lg), vodCats: cats(vg) };
+}
+async function loadM3U(p) {
+  const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), 90000);
+  try {
+    const r = await fetch(p.m3uUrl, { signal: ctrl.signal, cache: 'no-store' });
+    if (!r.ok) throw new Error('Sunucu hata döndürdü (HTTP ' + r.status + ')');
+    return parseM3U(await r.text());
+  } catch (e) {
+    if (e.name === 'AbortError') throw new Error('Sunucu yanıt vermedi (zaman aşımı).');
+    if (e instanceof TypeError) throw new Error('Sunucuya ulaşılamadı. Adresi ve internet bağlantını kontrol et.');
+    throw e;
+  } finally { clearTimeout(timer); }
+}
+
 async function authenticate(p) {
+  if (isM3U(p)) {
+    const m = await loadM3U(p);
+    if (p.id === S.activeId || !S.account) S.m3u = m;
+    S.lastM3U = m;
+    S.serverInfo = {};
+    return { status: 'Active', m3u: true, live: m.live.length, vod: m.vod.length };
+  }
   const d = await api(p);
   const ui = d && d.user_info;
   if (!ui || String(ui.auth) !== '1') throw new Error('Kullanıcı adı veya şifre hatalı.');
@@ -193,7 +247,12 @@ async function loadSection(sec, force) {
   const p = profile();
   showLoading({ live: 'Kanallar yükleniyor…', vod: 'Filmler yükleniyor…', series: 'Diziler yükleniyor…' }[sec]);
   try {
-    const [cats, items] = await Promise.all([api(p, SECTION_API[sec][0]), api(p, SECTION_API[sec][1])]);
+    let cats, items;
+    if (isM3U(p)) {
+      if (!S.m3u) S.m3u = await loadM3U(p);
+      const m = S.m3u;
+      [cats, items] = sec === 'live' ? [m.liveCats, m.live] : sec === 'vod' ? [m.vodCats, m.vod] : [[], []];
+    } else [cats, items] = await Promise.all([api(p, SECTION_API[sec][0]), api(p, SECTION_API[sec][1])]);
     const counts = {};
     const list = arr(items);
     for (const it of list) {
@@ -206,6 +265,7 @@ async function loadSection(sec, force) {
 }
 
 async function shortEpg(streamId, limit = 8) {
+  if (isM3U()) return [];
   try {
     const d = await api(profile(), 'get_short_epg', { stream_id: streamId, limit });
     return arr(d && d.epg_listings).map((e) => ({
@@ -217,9 +277,9 @@ async function shortEpg(streamId, limit = 8) {
 }
 
 // ---------------------------------------------------------------- öğe modelleri
-const mapLive = (s) => ({ type: 'live', id: s.stream_id, name: s.name, icon: s.stream_icon, num: s.num, cat: s.category_id });
+const mapLive = (s) => ({ type: 'live', id: s.stream_id, name: s.name, icon: s.stream_icon, num: s.num, cat: s.category_id, url: s.url });
 const yearOf = (m) => String(m.year || m.releaseDate || m.release_date || '').slice(0, 4).replace(/\D/g, '') || (String(m.name || '').match(/[(\[\s-]((?:19|20)\d{2})[)\]]?\s*$/) || [])[1] || '';
-const mapVod = (m) => ({ type: 'vod', id: m.stream_id, name: m.name, icon: m.stream_icon, ext: m.container_extension || 'mp4', rating: m.rating, added: +m.added || 0, year: yearOf(m), cat: m.category_id });
+const mapVod = (m) => ({ type: 'vod', id: m.stream_id, name: m.name, icon: m.stream_icon, ext: m.container_extension || 'mp4', rating: m.rating, added: +m.added || 0, year: yearOf(m), cat: m.category_id, url: m.url });
 const mapSeries = (s) => ({ type: 'series', id: s.series_id, name: s.name, icon: s.cover, rating: s.rating, added: +(s.last_modified || 0), year: s.releaseDate || s.release_date || '', cat: s.category_id });
 const MAP = { live: mapLive, vod: mapVod, series: mapSeries };
 const inCat = (raw, c) => String(raw.category_id) === c || arr(raw.category_ids).map(String).includes(c);
@@ -323,8 +383,8 @@ function renderAccount() {
   box.innerHTML = `<strong>${dl <= 0 ? 'Hesap süren doldu' : dl === 1 ? 'Hesabın yarın bitiyor' : `Hesabın ${dl} gün sonra bitiyor`}</strong><span class="k" style="color:inherit">${esc(fmtDate(a.exp_date))}</span>`;
 }
 $('#account').addEventListener('click', async () => { await setSection('account'); S.accPage = 'info'; render(); });
-const TITLES = { home: 'Anasayfa', live: 'Canlı TV', guide: 'TV Rehberi', vod: 'Filmler', series: 'Diziler', favs: 'Favoriler', recent: 'Son İzlenenler', settings: 'Ayarlar', account: 'Hesabım', search: 'Arama' };
-const NEEDS = { home: ['vod', 'series'], live: ['live'], guide: ['live'], vod: ['vod'], series: ['series'], search: ['live', 'vod', 'series'] };
+const TITLES = { home: 'Anasayfa', live: 'Canlı TV', guide: 'TV Rehberi', multi: 'Çoklu İzleme', vod: 'Filmler', series: 'Diziler', favs: 'Favoriler', recent: 'Son İzlenenler', settings: 'Ayarlar', account: 'Hesabım', search: 'Arama' };
+const NEEDS = { home: ['vod', 'series'], live: ['live'], guide: ['live'], multi: ['live'], vod: ['vod'], series: ['series'], search: ['live', 'vod', 'series'] };
 async function setSection(sec, opts = {}) {
   if (sec !== S.section) {
     if (!opts.keepQuery) { S.query = ''; $('#search').value = ''; }
@@ -350,9 +410,11 @@ function render() {
   parkVideo(); resetIO(); S.views = {};
   clearInterval(S.heroTimer); clearInterval(G.timer);
   const sec = S.section;
+  if (sec !== 'multi') MV.stopAll();
   if (sec === 'home') renderHome();
   else if (sec === 'live') renderLive();
   else if (sec === 'guide') renderGuide();
+  else if (sec === 'multi') renderMulti();
   else if (sec === 'search') renderSearch();
   else if (sec === 'account') renderAccountPage();
   else if (sec === 'vod') S.vodOpen ? renderVodDetail() : renderVod();
@@ -571,6 +633,17 @@ function renderSettings() {
       ${radios('liveView', [['grid', 'Logo ızgarası'], ['list', 'Liste + önizleme']], st.liveView)}</div>
     <div class="set-card"><h3>Vurgu rengi</h3>
       <div class="swatches">${['#F2B33D', '#5B8CFF', '#3DD68C', '#FF7A59'].map((c) => `<button type="button" class="swatch ${c === st.accent ? 'active' : ''}" style="background:${c}" data-act="accent" data-id="${c}" aria-label="Renk ${c}"></button>`).join('')}</div></div>
+    <div class="set-card"><h3>TV / kumanda modu</h3>
+      <p>Televizyona bağlı bilgisayarlar için: arayüz büyür, tam ekran açılır ve her yerde yalnızca yön tuşları, Enter ve Geri ile gezinilir.</p>
+      ${radios('tvMode', [['off', 'Kapalı'], ['on', 'Açık']], st.tvMode ? 'on' : 'off')}</div>
+    <div class="set-card"><h3>Yedekleme</h3>
+      <p>Profilleri, favorileri, izleme geçmişini ve ayarları tek dosyaya kaydet; başka bir bilgisayarda geri yükle.</p>
+      <label class="check"><input type="checkbox" id="bkSecrets"> Şifreleri de dahil et (dosyada açık metin olarak durur)</label>
+      <div class="actions"><button type="button" class="btn ghost small" data-act="bk-export">Dışa aktar</button><button type="button" class="btn ghost small" data-act="bk-import">İçe aktar</button></div>
+      <input type="file" id="bkFile" accept="application/json,.json" class="hidden"></div>
+    <div class="set-card"><h3>Sorun bildir</h3>
+      <p>Uygulama ve sistem bilgileriyle son hata kayıtlarını içeren bir GitHub sorun kaydı hazırlar. Sunucu adresi, kullanıcı adı ve şifre gizlenir.</p>
+      <div class="actions"><button type="button" class="btn ghost small" data-act="report">Sorun bildir</button></div></div>
     <div class="set-card"><h3>Güncellemeler</h3>
       <p>${esc('Sürüm ' + APP_VER)}</p>
       <div class="actions"><button type="button" class="btn ghost small" data-act="update-check">Güncellemeleri denetle</button></div></div>
@@ -639,6 +712,7 @@ async function fetchInfo(item) {
   const key = item.type + '_' + item.id;
   if (S.info[key]) { if (item.type === 'series' && S.info[key].raw) item.info = S.info[key].raw; return S.info[key]; }
   const p = profile();
+  if (isM3U(p)) return (S.info[key] = { backdrop: '', cover: item.icon || '', plot: '', genre: '', year: item.year || '', duration: '', rating: '', cast: '', director: '', trailer: '', raw: null });
   let i = {}, raw = null;
   if (item.type === 'vod') { raw = await api(p, 'get_vod_info', { vod_id: item.id }); i = (raw && raw.info) || {}; }
   else if (item.type === 'series') { raw = await api(p, 'get_series_info', { series_id: item.id }); i = (raw && raw.info) || {}; item.info = raw; }
@@ -841,7 +915,8 @@ function renderGuide() {
   const posNow = () => { const n = $('#gnow'); if (n) n.style.left = (G.CH + (Date.now() - G.start) / 60000 * G.PX) + 'px'; };
   posNow();
   clearInterval(G.timer); G.timer = setInterval(posNow, 30000);
-  $('#gscroll').scrollLeft = Math.max(0, (now - G.start) / 60000 * G.PX - 120);
+  // şu anki yarım saatin başını görünür yap
+  $('#gscroll').scrollLeft = Math.max(0, (Math.floor(now / half) * half - G.start) / 60000 * G.PX);
 }
 function pumpEpg() {
   while (G.active < 4 && G.q.length) {
@@ -910,7 +985,11 @@ async function renderAccountPage() {
   const title = ACC_CARDS.find((c) => c[0] === pg)[1];
   const head = `<div class="acc-head"><button type="button" class="back-link" style="margin:0" data-act="acc-back">${ICON.back}Hesabım</button><h2>${esc(title)}</h2></div>`;
   let body = '';
-  if (pg === 'info') {
+  if (pg === 'info' && isM3U()) {
+    let host = ''; try { host = new URL(profile().m3uUrl).host; } catch { /* */ }
+    body = `<div class="info-grid">${cell('Profil türü', 'M3U listesi')}${cell('Kanal sayısı', String(S.m3u ? S.m3u.live.length : 0))}${cell('Film sayısı', String(S.m3u ? S.m3u.vod.length : 0))}${cell('Sunucu', host || '—')}</div>
+      <p class="muted" style="margin-top:16px">M3U listelerinde bitiş tarihi ve bağlantı limiti bilgisi bulunmaz; bu bilgiler için sağlayıcının paneline bakmalısın.</p>`;
+  } else if (pg === 'info') {
     const a = S.account || {}, si = S.serverInfo || {};
     const dl = daysLeft(a.exp_date);
     let host = ''; try { host = new URL(profile().server).host; } catch { /* */ }
@@ -928,7 +1007,7 @@ async function renderAccountPage() {
   } else if (pg === 'profile') {
     const p = profile();
     body = `<div class="info-grid">
-      ${cell('Profil adı', p.name)}${cell('Sunucu', p.server)}${cell('Kullanıcı adı', p.username)}${cell('Şifre', '••••••••')}
+      ${isM3U(p) ? cell('Profil adı', p.name) + cell('Profil türü', 'M3U listesi') + cell('M3U liste adresi', '••••••••') : cell('Profil adı', p.name) + cell('Sunucu', p.server) + cell('Kullanıcı adı', p.username) + cell('Şifre', '••••••••')}
       ${cell('Şifre saklama', ENC_OK ? 'Şifreli (' + ENC_NAME + ')' : 'Şifrelenmemiş', ENC_OK ? 'Şifre yalnızca ' + ENC_USER + ' tarafından çözülebilir.' : 'Bu sistemde şifreleme kullanılamıyor.', ENC_OK ? 'ok-t' : 'bad-t')}
       ${cell('Otomatik bağlan', p.auto ? 'Açık' : 'Kapalı')}
     </div><div class="actions" style="margin-top:18px"><button type="button" class="btn primary small" data-act="acc-edit">Profili düzenle</button><button type="button" class="btn ghost small" data-act="profiles">Profilleri yönet</button></div>`;
@@ -980,7 +1059,11 @@ async function runDiag() {
   paint(row('Sunucu yanıt süresi', 'ölçülüyor…'));
   try {
     const t = [];
-    for (let i = 0; i < 3; i++) { const t0 = performance.now(); await api(p); t.push(performance.now() - t0); }
+    for (let i = 0; i < 3; i++) {
+      const t0 = performance.now();
+      if (isM3U(p)) { const c = new AbortController(); await fetch(p.m3uUrl, { signal: c.signal, cache: 'no-store' }); c.abort(); } else await api(p);
+      t.push(performance.now() - t0);
+    }
     const ms = Math.round(t.reduce((a, b) => a + b, 0) / t.length);
     rows.push(row('Sunucu yanıt süresi', ms + ' ms', ms < 400 ? 'ok' : ms < 1200 ? 'warn' : 'bad'));
   } catch (e) { rows.push(row('Sunucu yanıt süresi', e.message, 'bad')); }
@@ -990,7 +1073,7 @@ async function runDiag() {
     const ch = visible('live', S.cache.live.items)[0];
     if (!ch) throw new Error('Test için kanal yok');
     if (Engine.item) { Engine.stop(); parkVideo(); }
-    const url = `${p.server}/live/${encodeURIComponent(p.username)}/${encodeURIComponent(p.password)}/${ch.stream_id}.ts`;
+    const url = candidates(mapLive(ch))[0].url;
     const ctrl = new AbortController();
     const r = await fetch(url, { signal: ctrl.signal });
     const reader = r.body.getReader();
@@ -1029,6 +1112,115 @@ async function runDiag() {
   paint();
 }
 
+// ---------------- çoklu izleme
+// Her hücrenin kendi oynatıcısı var; ana oynatıcıdan bağımsız, gecikmesi düşük tutulur.
+class CellPlayer {
+  constructor(video) { this.v = video; this.h = null; this.t = null; this.run = 0; }
+  teardown() {
+    clearTimeout(this.to);
+    try { if (this.h) this.h.destroy(); } catch { /* */ }
+    try { if (this.t) { this.t.pause(); this.t.unload(); this.t.detachMediaElement(); this.t.destroy(); } } catch { /* */ }
+    this.h = null; this.t = null; this.v.onerror = null; this.v.onplaying = null;
+    this.v.removeAttribute('src'); try { this.v.load(); } catch { /* */ }
+  }
+  stop() { this.run++; this.teardown(); }
+  play(item, onState) {
+    this.stop();
+    const run = this.run, cands = candidates(item);
+    let i = 0;
+    const next = () => {
+      if (run !== this.run) return;
+      this.teardown();
+      const c = cands[i++];
+      if (!c) { onState('error'); return; }
+      onState('loading');
+      const fail = () => { if (run === this.run) next(); };
+      this.to = setTimeout(fail, 20000);
+      this.v.onplaying = () => { clearTimeout(this.to); onState('ok'); };
+      const go = () => { const p = this.v.play(); if (p && p.catch) p.catch(() => {}); };
+      if (c.type === 'hls') {
+        if (!window.Hls || !Hls.isSupported()) return fail();
+        this.h = new Hls({ enableWorker: true, maxBufferLength: 10, liveSyncDurationCount: 2 });
+        this.h.on(Hls.Events.ERROR, (e, d) => { if (d.fatal) fail(); });
+        this.h.on(Hls.Events.MANIFEST_PARSED, go);
+        this.h.loadSource(c.url); this.h.attachMedia(this.v);
+      } else if (c.type === 'ts' || c.type === 'tsvod') {
+        if (!window.mpegts || !mpegts.getFeatureList().mseLivePlayback) return fail();
+        this.t = mpegts.createPlayer({ type: 'mpegts', isLive: item.type === 'live', url: c.url },
+          { enableWorker: true, enableStashBuffer: false, liveBufferLatencyChasing: true, liveBufferLatencyMaxLatency: 3, liveBufferLatencyMinRemain: 1, autoCleanupSourceBuffer: true });
+        this.t.on(mpegts.Events.ERROR, fail);
+        this.t.attachMediaElement(this.v); this.t.load(); go();
+      } else { this.v.onerror = fail; this.v.src = c.url; go(); }
+    };
+    next();
+  }
+}
+const MV = {
+  layout: LS.get('catana.mvLayout', 4), cells: [null, null, null, null], players: [], audio: 0,
+  stopAll() { this.players.forEach((p) => p && p.stop()); this.players = []; },
+  limit() { const m = +(S.account && S.account.max_connections); return isM3U() || !m ? 0 : m; }
+};
+function renderMulti() {
+  MV.stopAll();
+  if (Engine.item) { Engine.stop(); parkVideo(); }
+  const n = MV.layout;
+  const used = MV.cells.slice(0, n).filter(Boolean).length;
+  const lim = MV.limit();
+  view.innerHTML = `<div class="scroll"><div class="pad mv-pad">
+    <div class="mv-bar">
+      <div class="seg mv-seg"><button type="button" class="${n === 2 ? 'active' : ''}" data-act="mv-layout" data-id="2" title="2">${MV_ICON2}</button><button type="button" class="${n === 4 ? 'active' : ''}" data-act="mv-layout" data-id="4" title="4">${MV_ICON4}</button></div>
+      <span class="muted small">Sesi duymak istediğin pencereye tıkla. Çift tık: tam ekran.</span>
+      <div class="grow"></div>
+      ${lim && used > lim ? `<span class="mv-warn">${esc('Paketin aynı anda ' + lim + ' yayına izin veriyor; fazlası açılmayabilir.')}</span>` : ''}
+      <button type="button" class="btn ghost small" data-act="mv-full">Tam ekran</button>
+    </div>
+    <div class="mv-grid n${n}" id="mvGrid">${Array.from({ length: n }, (_, i) => {
+      const it = MV.cells[i];
+      return it ? `<div class="mv-cell ${i === MV.audio ? 'audio' : ''}" data-mv="${i}">
+          <video playsinline ${i === MV.audio ? '' : 'muted'}></video>
+          <div class="mv-status" data-st="${i}"><div class="spinner"></div></div>
+          <div class="mv-top"><span class="mv-name">${esc(it.name)}</span><span class="grow"></span>
+            <button type="button" class="p-icon" data-act="mv-pick" data-id="${i}" title="Kanalı değiştir" aria-label="Kanalı değiştir"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg></button>
+            <button type="button" class="p-icon" data-act="mv-clear" data-id="${i}" title="Kapat" aria-label="Kapat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+          <span class="mv-audio">${ICON.audio}</span>
+        </div>`
+        : `<button type="button" class="mv-cell empty" data-act="mv-pick" data-id="${i}"><span class="mv-plus">+</span><span>Kanal ekle</span></button>`;
+    }).join('')}</div></div></div>`;
+  $$('#mvGrid .mv-cell[data-mv]').forEach((el) => {
+    const i = +el.dataset.mv, v = $('video', el), pl = new CellPlayer(v);
+    MV.players[i] = pl;
+    pl.play(MV.cells[i], (st) => {
+      const box = $(`[data-st="${i}"]`); if (!box) return;
+      box.classList.toggle('hidden', st === 'ok');
+      box.innerHTML = st === 'error' ? `<span>${esc(t('Yayın açılamadı.'))}</span>` : '<div class="spinner"></div>';
+    });
+    el.addEventListener('click', (e) => { if (e.target.closest('button')) return; setMvAudio(i); });
+    el.addEventListener('dblclick', (e) => { if (e.target.closest('button')) return; if (document.fullscreenElement) document.exitFullscreen(); else el.requestFullscreen().catch(() => {}); });
+  });
+}
+const MV_ICON2 = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="8" height="12" rx="1.5"/><rect x="13" y="6" width="8" height="12" rx="1.5"/></svg>';
+const MV_ICON4 = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>';
+function setMvAudio(i) {
+  MV.audio = i;
+  $$('#mvGrid .mv-cell[data-mv]').forEach((el) => { const on = +el.dataset.mv === i; el.classList.toggle('audio', on); $('video', el).muted = !on; });
+}
+function pickChannel(onPick) {
+  const all = visible('live', S.cache.live.items).map(mapLive);
+  const favIds = new Set((favs().live || []).map((f) => String(f.id)));
+  const base = [...all.filter((x) => favIds.has(String(x.id))), ...all.filter((x) => !favIds.has(String(x.id)))];
+  openModal(`<h3>Kanal seç</h3><input class="pick-search" id="pickQ" placeholder="Kanal ara…" autocomplete="off"><div class="pick-list" id="pickList"></div>`);
+  const draw = () => {
+    const q = lower($('#pickQ').value.trim());
+    const list = (q ? base.filter((x) => lower(x.name).includes(q)) : base).slice(0, 200);
+    S.views.pick = list;
+    $('#pickList').innerHTML = list.map((it, i) => liveRow(it, i, 'pick', false).replace('data-act="live-row"', 'data-pick="1"')).join('') || '<div class="m-note">Kanal bulunamadı.</div>';
+  };
+  draw();
+  $('#pickQ').addEventListener('input', draw);
+  $('#pickQ').focus();
+  $('#pickList').addEventListener('click', (e) => { const el = e.target.closest('[data-pick]'); if (!el) return; const it = S.views.pick[+el.dataset.i]; S.modalResolve = null; closeModal(); onPick(it); });
+}
+
 // ---------------------------------------------------------------- oynatma motoru
 const video = $('#video');
 const videoWrap = $('#videoWrap');
@@ -1044,6 +1236,13 @@ const DVR_SECONDS = 30 * 60; // canlı yayında geri sarılabilecek süre
 
 function candidates(item) {
   const p = profile();
+  if (item.url) { // M3U: doğrudan adres
+    const path = item.url.split('?')[0].toLowerCase();
+    if (/\.m3u8$/.test(path)) return [{ type: 'hls', url: item.url }];
+    if (item.type !== 'live') return /\.ts$/.test(path) ? [{ type: 'tsvod', url: item.url }] : [{ type: 'native', url: item.url }];
+    const ts = { type: 'ts', url: item.url }, hls = { type: 'hls', url: item.url };
+    return S.settings.format === 'hls' ? [hls, ts] : [ts, hls, { type: 'native', url: item.url }];
+  }
   const u = encodeURIComponent(p.username), pw = encodeURIComponent(p.password), b = p.server;
   if (item.type === 'live') {
     const ts = { type: 'ts', url: `${b}/live/${u}/${pw}/${item.id}.ts` };
@@ -1649,6 +1848,13 @@ view.addEventListener('click', async (e) => {
   if (act === 'accent') { S.settings.accent = el.dataset.id; saveSettings(); applyAccent(); render(); return; }
   if (act === 'profiles') { showLogin(true); return; }
   if (act === 'reload-all') { refreshAll(); return; }
+  if (act === 'bk-export') { exportBackup($('#bkSecrets').checked); return; }
+  if (act === 'bk-import') { const f = $('#bkFile'); f.value = ''; f.onchange = () => { if (f.files[0]) importBackup(f.files[0]); }; f.click(); return; }
+  if (act === 'report') { openReport(); return; }
+  if (act === 'mv-layout') { MV.layout = +el.dataset.id; LS.set('catana.mvLayout', MV.layout); if (MV.audio >= MV.layout) MV.audio = 0; render(); return; }
+  if (act === 'mv-pick') { const i = +el.dataset.id; pickChannel((it) => { MV.cells[i] = it; if (!MV.cells.some((c, k) => c && k === MV.audio)) MV.audio = i; render(); }); return; }
+  if (act === 'mv-clear') { const i = +el.dataset.id; MV.cells[i] = null; render(); return; }
+  if (act === 'mv-full') { const g = $('#mvGrid'); if (g) g.requestFullscreen().catch(() => {}); return; }
   if (act === 'update-check') { el.disabled = true; await checkUpdate(true); el.disabled = false; return; }
   if (act === 'lang-save') {
     const pick = $('input[name=langPick]:checked'); if (!pick) return;
@@ -1679,6 +1885,7 @@ view.addEventListener('change', async (e) => {
     return;
   }
   if (t.type !== 'radio' || t.name === 'langPick') return;
+  if (t.name === 'tvMode') { S.settings.tvMode = t.value === 'on'; saveSettings(); applyTvMode(); return; }
   S.settings[t.name] = t.value; saveSettings();
   if (t.name === 'liveView') $$('#viewToggle button').forEach((b) => b.classList.toggle('active', b.dataset.view === t.value));
 });
@@ -1726,12 +1933,60 @@ async function refreshAll() {
 $('#refreshAll').addEventListener('click', refreshAll);
 $('#profileBtn').addEventListener('click', () => showLogin(true));
 
+// ---------------- TV / kumanda modu: yön tuşlarıyla odak gezdirme
+const ARROWS = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
+const tvMode = () => !!S.settings.tvMode;
+function focusables(root) {
+  return [...root.querySelectorAll('button, a[href], input, select, [tabindex]:not([tabindex="-1"])')]
+    .filter((el) => !el.disabled && el.offsetParent !== null && !el.closest('.hidden'));
+}
+function spatialMove(dir, root) {
+  const list = focusables(root); if (!list.length) return false;
+  const cur = document.activeElement;
+  if (!cur || !root.contains(cur) || cur === document.body) { list[0].focus(); list[0].scrollIntoView({ block: 'nearest', inline: 'nearest' }); return true; }
+  const a = cur.getBoundingClientRect(), ax = a.left + a.width / 2, ay = a.top + a.height / 2;
+  let best = null, bestScore = Infinity;
+  for (const el of list) {
+    if (el === cur || el.contains(cur) || cur.contains(el)) continue;
+    const b = el.getBoundingClientRect(), bx = b.left + b.width / 2, by = b.top + b.height / 2;
+    const dx = bx - ax, dy = by - ay;
+    const along = dx * dir[0] + dy * dir[1];
+    if (along <= 4) continue;
+    const across = Math.abs(dir[0] ? dy : dx);
+    const score = along + across * 2.5;
+    if (score < bestScore) { bestScore = score; best = el; }
+  }
+  if (best) { best.focus({ preventScroll: true }); best.scrollIntoView({ block: 'nearest', inline: 'nearest' }); return true; }
+  return false;
+}
+function tvBack() {
+  if (S.vodOpen || S.seriesOpen) return closeDetail();
+  if (S.section === 'account' && S.accPage) { S.accPage = null; return render(); }
+  if (S.section !== 'home') return setSection('home');
+}
+function applyTvMode() {
+  document.documentElement.classList.toggle('tv', tvMode());
+  if (NATIVE && NATIVE.setFullScreen) NATIVE.setFullScreen(tvMode());
+}
+
 document.addEventListener('keydown', (e) => {
-  if (modalOpen()) { if (e.key === 'Escape') closeModal(); return; }
+  if (modalOpen()) {
+    if (e.key === 'Escape' || (tvMode() && e.key === 'Backspace' && !/INPUT/.test(document.activeElement.tagName))) { e.preventDefault(); closeModal(); return; }
+    if (tvMode() && ARROWS[e.key] && !(/INPUT/.test(document.activeElement.tagName) && (e.key === 'ArrowLeft' || e.key === 'ArrowRight'))) { e.preventDefault(); spatialMove(ARROWS[e.key], $('#modalCard')); }
+    return;
+  }
   const typing = /INPUT|SELECT|TEXTAREA/.test(document.activeElement && document.activeElement.tagName) && document.activeElement.type !== 'range';
   if (playerOpen()) {
     if (typing && e.key !== 'Escape') return;
     const k = e.key;
+    // TV modunda açık menü / kanal panelinde yön tuşları gezinir, Enter seçer
+    if (tvMode() && (Menu.isOpen() || P.side)) {
+      const root = Menu.isOpen() ? $('#pMenu') : $('#pSide');
+      if (ARROWS[k]) { e.preventDefault(); spatialMove(ARROWS[k], root); wakeUi(); return; }
+      if (k === 'Backspace' || k === 'Escape') { e.preventDefault(); if (Menu.isOpen()) { if (Menu.page !== 'main') Menu.go('main'); else Menu.close(); } else toggleSide(false); return; }
+      if (k === 'Enter') return;
+    }
+    if (tvMode() && k === 'Enter') { e.preventDefault(); if (P.ctx.item.type === 'live') { toggleSide(true); setTimeout(() => spatialMove([0, 1], $('#pSideItems')), 50); } else Menu.open(); wakeUi(); return; }
     if (k === 'Escape') {
       if (Date.now() - P.lastFs < 400) return;
       if (Menu.isOpen()) return Menu.close();
@@ -1755,9 +2010,21 @@ document.addEventListener('keydown', (e) => {
     wakeUi();
     return;
   }
-  if (!$('#login').classList.contains('hidden')) return;
+  if (!$('#login').classList.contains('hidden')) {
+    if (tvMode() && ARROWS[e.key] && !typing) { e.preventDefault(); spatialMove(ARROWS[e.key], $('#login')); }
+    return;
+  }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); $('#search').focus(); $('#search').select(); return; }
-  if (typing) { if (e.key === 'Escape') document.activeElement.blur(); return; }
+  if (typing) {
+    if (e.key === 'Escape') document.activeElement.blur();
+    if (tvMode() && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) { e.preventDefault(); spatialMove(ARROWS[e.key], $('#app')); }
+    return;
+  }
+  if (tvMode()) {
+    if (ARROWS[e.key]) { e.preventDefault(); spatialMove(ARROWS[e.key], $('#app')); return; }
+    if (e.key === 'Backspace' || e.key === 'Escape') { e.preventDefault(); tvBack(); return; }
+    return;
+  }
   if (S.section === 'live' && S.settings.liveView === 'list' && S.views.live && S.views.live.length) {
     const L = S.views.live; let i = S.selLive ? L.indexOf(S.selLive) : -1;
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -1781,26 +2048,44 @@ function renderProfiles() {
   const box = $('#profileList');
   if (!S.profiles.length) { box.innerHTML = '<p class="muted small">Henüz kayıtlı profil yok.</p>'; return; }
   box.innerHTML = S.profiles.map((p) => {
-    let host = p.server; try { host = new URL(p.server).host; } catch { /* */ }
+    let host = p.server || p.m3uUrl || ''; try { host = new URL(host).host; } catch { /* */ }
     return `<div class="prof ${p.id === S.activeId && S.account ? 'active' : ''}">
       <span class="avatar">${esc(initials(p.name))}</span>
-      <button type="button" class="prof-main" data-pid="${p.id}" data-pa="use"><span class="pn">${esc(p.name)}</span><span class="ps">${esc(host)} · ${esc(p.username)}</span></button>
+      <button type="button" class="prof-main" data-pid="${p.id}" data-pa="use"><span class="pn">${esc(p.name)}</span><span class="ps">${esc(host)} · ${esc(p.type === 'm3u' ? 'M3U' : p.username)}</span></button>
       <button type="button" class="mini" data-pid="${p.id}" data-pa="edit" aria-label="Düzenle">${ICON.edit}</button>
       <button type="button" class="mini" data-pid="${p.id}" data-pa="del" aria-label="Sil">${ICON.trash}</button></div>`;
   }).join('');
 }
+function setFormType(type) {
+  S.formType = type;
+  $$('.seg-tabs [data-ftype]').forEach((b) => b.classList.toggle('active', b.dataset.ftype === type));
+  $$('.f-xtream').forEach((el) => el.classList.toggle('hidden', type !== 'xtream'));
+  $$('.f-m3u').forEach((el) => el.classList.toggle('hidden', type !== 'm3u'));
+  $('#formHint').textContent = type === 'm3u' ? 'Sağlayıcının verdiği M3U liste adresini yapıştır.' : 'Sağlayıcının verdiği sunucu adresini ve hesap bilgilerini gir.';
+}
+$$('.seg-tabs [data-ftype]').forEach((b) => b.addEventListener('click', () => { setFormType(b.dataset.ftype); msg(''); }));
 function setForm(p) {
   S.editingId = p ? p.id : null;
+  setFormType(p && p.type === 'm3u' ? 'm3u' : 'xtream');
+  form.m3u.value = p && p.m3uUrl ? p.m3uUrl : '';
   form.name.value = p ? p.name : '';
   form.server.value = p ? p.server : '';
   form.username.value = p ? p.username : '';
   form.password.value = p ? p.password : '';
   form.auto.checked = p ? !!p.auto : true;
-  $('#formTitle').textContent = p ? 'Profili düzenle' : 'Xtream Codes ile bağlan';
+  $('#formTitle').textContent = p ? 'Profili düzenle' : 'Profil ekle';
   msg('');
 }
 function msg(t, kind) { const m = $('#formMsg'); m.textContent = t; m.className = 'form-msg ' + (kind || ''); }
 function readForm() {
+  if (S.formType === 'm3u') {
+    let url = form.m3u.value.trim();
+    if (!url) throw new Error('M3U liste adresi gerekli.');
+    if (!/^(https?|file):\/\//i.test(url)) url = 'http://' + url;
+    const p = { id: S.editingId || uid(), type: 'm3u', name: form.name.value.trim(), m3uUrl: url, auto: form.auto.checked };
+    if (!p.name) { try { p.name = new URL(url).hostname || 'M3U'; } catch { p.name = 'M3U'; } }
+    return p;
+  }
   const p = {
     id: S.editingId || uid(),
     name: form.name.value.trim(),
@@ -1831,6 +2116,7 @@ $('#testBtn').addEventListener('click', async () => {
   try {
     const p = readForm(); msg('Test ediliyor…');
     const ui = await authenticate(p);
+    if (ui.m3u) { msg(`Liste okundu · ${ui.live} kanal · ${ui.vod} film`, 'ok'); return; }
     const exp = ui.exp_date && +ui.exp_date ? new Date(+ui.exp_date * 1000).toLocaleDateString(DATE_LOC) : 'sınırsız';
     msg(`Bağlantı başarılı · bitiş: ${exp} · bağlantı: ${ui.active_cons ?? 0}/${ui.max_connections ?? '?'}`, 'ok');
   } catch (err) { msg(err.message, 'err'); }
@@ -1857,12 +2143,95 @@ async function connect(p, save) {
   if (S.activeId !== p.id) { S.cache = {}; S.info = {}; G.cache = {}; S.cat = { live: 'all', vod: 'all', series: 'all', guide: null }; S.selLive = null; }
   Engine.stop(); parkVideo();
   S.activeId = p.id; S.account = ui;
+  S.m3u = isM3U(p) ? S.lastM3U : null;
+  if (isM3U(p)) S.cache = {};
+  // M3U listelerinde dizi ve yayın akışı yok
+  ['series', 'guide'].forEach((sec) => $(`.nav [data-section=${sec}]`).classList.toggle('hidden', isM3U(p)));
   saveProfiles();
   hideLogin();
   $('#app').classList.remove('hidden');
   renderAccount();
   S.hero = null; S.adultUnlocked = false;
   await setSection('home', { force: !S.cache.vod });
+}
+
+// ---------------------------------------------------------------- yedekleme
+function exportBackup(withSecrets) {
+  const data = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith('catana.') && k !== 'catana.profiles') data[k] = LS.get(k, null);
+  }
+  data['catana.profiles'] = S.profiles.map((p) => {
+    const o = Object.assign({}, p);
+    if (!withSecrets) { delete o.password; delete o.m3uUrl; }
+    return o;
+  });
+  const blob = new Blob([JSON.stringify({ app: 'catana-iptv', version: APP_VER, exportedAt: new Date().toISOString(), secrets: !!withSecrets, data }, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'catana-iptv-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  toast(t('Yedek dosyası hazırlandı'));
+}
+async function importBackup(file) {
+  let j;
+  try { j = JSON.parse(await file.text()); } catch { toast(t('Yedek dosyası okunamadı.'), true); return; }
+  if (!j || j.app !== 'catana-iptv' || !j.data) { toast(t('Bu bir Catana IPTV yedek dosyası değil.'), true); return; }
+  if (!confirm(t('Mevcut profiller ve ayarlar yedekteki bilgilerle değiştirilecek. Devam edilsin mi?'))) return;
+  const old = new Map(S.profiles.map((p) => [p.id, p]));
+  for (const [k, v] of Object.entries(j.data)) if (k.startsWith('catana.') && k !== 'catana.profiles') LS.set(k, v);
+  // yedekte şifre yoksa bu bilgisayardaki aynı profilin şifresini koru
+  S.profiles = (j.data['catana.profiles'] || []).map((p) => {
+    const o = old.get(p.id);
+    return Object.assign({}, p, { password: p.password || (o && o.password) || '', m3uUrl: p.m3uUrl || (o && o.m3uUrl) || '' });
+  });
+  S.activeId = j.data['catana.activeId'] || (S.profiles[0] && S.profiles[0].id) || null;
+  saveProfiles();
+  location.reload();
+}
+
+// ---------------------------------------------------------------- sorun bildirme
+const LOGS = [];
+const pushLog = (lvl, args) => {
+  const line = new Date().toISOString().slice(11, 19) + ' ' + lvl + ' ' + [...args].map((a) => (a instanceof Error ? a.message : typeof a === 'object' ? (() => { try { return JSON.stringify(a); } catch { return String(a); } })() : String(a))).join(' ');
+  LOGS.push(line.slice(0, 400)); if (LOGS.length > 60) LOGS.shift();
+};
+['warn', 'error'].forEach((lvl) => { const orig = console[lvl].bind(console); console[lvl] = (...a) => { pushLog(lvl.toUpperCase(), a); orig(...a); }; });
+window.addEventListener('error', (e) => pushLog('ERROR', [e.message + ' @' + (e.filename || '').split('/').pop() + ':' + e.lineno]));
+window.addEventListener('unhandledrejection', (e) => pushLog('ERROR', ['unhandled: ' + (e.reason && e.reason.message || e.reason)]));
+function sanitize(text) {
+  let s = String(text);
+  for (const p of S.profiles) {
+    const secrets = [p.password, p.username, p.m3uUrl, p.server];
+    try { if (p.server) secrets.push(new URL(p.server).host); if (p.m3uUrl) secrets.push(new URL(p.m3uUrl).host); } catch { /* */ }
+    for (const x of secrets) if (x && String(x).length > 2) s = s.split(String(x)).join('***');
+  }
+  return s.replace(/(username|password)=[^&\s]+/gi, '$1=***');
+}
+function reportText() {
+  const v = NATIVE ? NATIVE.versions : {};
+  const os = (NATIVE && NATIVE.platform) || navigator.platform;
+  return {
+    version: APP_VER, os: `${os} · Electron ${v.electron || '?'} · Chromium ${v.chrome || '?'}`,
+    env: [`Language: ${LANG}`, `Profile type: ${isM3U() ? 'M3U' : 'Xtream'}`, `Stream format: ${S.settings.format}`, `Buffer: ${S.settings.buffer}`, `Section: ${S.section}`, `Player: ${Engine.mode || '-'}`].join('\n'),
+    logs: sanitize(LOGS.slice(-40).join('\n')) || '(no errors logged)'
+  };
+}
+function openReport() {
+  const r = reportText();
+  const preview = `Version: ${r.version}\nOS: ${r.os}\n${r.env}\n\n${r.logs}`;
+  openModal(`<h3>Sorun bildir</h3><p class="muted small">Aşağıdaki bilgiler GitHub'daki sorun kaydına eklenecek. Gizli bilgiler *** ile değiştirildi. Sorunu açıklamayı GitHub sayfasında yapabilirsin.</p>
+    <textarea class="report-box" readonly>${esc(preview)}</textarea>
+    <div class="actions"><button type="button" class="btn primary" id="repGo">GitHub'da aç</button><button type="button" class="btn ghost" id="repCopy">Kopyala</button></div>`);
+  $('#repCopy').onclick = () => { navigator.clipboard.writeText(preview).then(() => toast(t('Kopyalandı'))); };
+  $('#repGo').onclick = () => {
+    const q = new URLSearchParams({ template: 'bug_report.yml', title: '[Bug] ', version: r.version, os: r.os, environment: r.env, logs: r.logs.slice(-2500) });
+    const url = 'https://github.com/' + REPO + '/issues/new?' + q.toString();
+    if (NATIVE) NATIVE.openExternal(url); else window.open(url);
+    closeModal();
+  };
 }
 
 // ---------------------------------------------------------------- güncelleme
@@ -1908,6 +2277,7 @@ $('#updateBox').addEventListener('click', openUpdate);
 // ---------------------------------------------------------------- başlat
 (async function init() {
   startI18n();
+  applyTvMode();
   if (Date.now() - (LS.get('catana.updateChecked', 0) || 0) > 6 * 3600 * 1000) setTimeout(() => checkUpdate(false), 5000);
   if (IS_MAC) $('.search kbd').textContent = '⌘K';
   applyAccent(); applyFit();

@@ -1,7 +1,7 @@
 {
   "name": "catana-iptv",
   "productName": "Catana IPTV",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Catana IPTV — Xtream Codes desktop player",
   "main": "main.js",
   "author": {
@@ -13,7 +13,8 @@
     "start": "electron .",
     "dist": "electron-builder --win nsis",
     "dist:mac": "electron-builder --mac",
-    "dist:linux": "electron-builder --linux AppImage deb rpm"
+    "dist:linux": "electron-builder --linux AppImage deb rpm",
+    "test": "playwright test"
   },
   "dependencies": {
     "hls.js": "^1.7.4",
@@ -21,7 +22,8 @@
   },
   "devDependencies": {
     "electron": "^45.2.3",
-    "electron-builder": "^26.18.0"
+    "electron-builder": "^26.18.0",
+    "@playwright/test": "^1.65.0"
   },
   "build": {
     "appId": "com.catana.iptv",

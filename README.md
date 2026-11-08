@@ -4,12 +4,13 @@
 
 # Catana IPTV
 
-**A clean, modern desktop player for Xtream Codes IPTV — Windows, macOS & Linux.**
+**A clean, modern desktop IPTV player for Xtream Codes and M3U playlists — Windows, macOS & Linux.**
 
 [![Release](https://img.shields.io/github/v/release/hakancatana/catana-iptv?color=F2B33D&label=release)](https://github.com/hakancatana/catana-iptv/releases/latest)
 ![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-1D222B)
 ![Languages](https://img.shields.io/badge/languages-9-1D222B)
 [![License](https://img.shields.io/github/license/hakancatana/catana-iptv?color=1D222B)](LICENSE)
+[![Tests](https://github.com/hakancatana/catana-iptv/actions/workflows/test.yml/badge.svg)](https://github.com/hakancatana/catana-iptv/actions/workflows/test.yml)
 
 [**Download**](#download) · [Features](#features) · [Screenshots](#screenshots) · [Build from source](#build-from-source)
 
@@ -53,12 +54,16 @@ On Linux, passwords are encrypted with the system keyring (GNOME Keyring / KWall
 
 ## Features
 
+**Sources**
+- **Xtream Codes** accounts and **M3U playlists**, several profiles side by side
+
 **Live TV**
 - Channel logo grid or list view with live preview and schedule
 - **Rewind live TV** up to 30 minutes, jump back with the *LIVE* button — like YouTube
 - Quick channel panel inside the player with categories, *All* and *Favourites*
 - ↑ / ↓ to zap, **Backspace** to jump to the previous channel
 - Full **TV guide** (EPG grid) with a now-line and programme details
+- **Multi-View**: watch 2 or 4 channels at once, click a window to hear it
 
 **Movies & Series**
 - Home screen with a featured slider, *Continue watching*, recent movies and series
@@ -72,10 +77,15 @@ On Linux, passwords are encrypted with the system keyring (GNOME Keyring / KWall
 - **Mini player** (picture-in-picture) keeps playing while you use other apps
 - Keeps the screen awake while playing
 
+**On the sofa**
+- **TV / remote mode**: larger interface, full screen, everything reachable with the arrow keys, Enter and Back
+
 **Account & privacy**
-- Multiple Xtream profiles; passwords stored encrypted (Windows DPAPI / macOS Keychain / Linux keyring)
+- Passwords and playlist URLs stored encrypted (Windows DPAPI / macOS Keychain / Linux keyring)
+- **Backup**: export and import profiles, favourites, history and settings
 - Hide categories you never use; hide adult categories or protect them with a 4-digit PIN
 - Account details (expiry, connection limit), device check (latency, speed, codec support)
+- **Report a problem** from the app — version, system and logs are filled in, credentials are hidden
 
 **9 languages** — English, Deutsch, Français, Español, Italiano, Türkçe, Русский, 简体中文, हिन्दी
 
@@ -95,6 +105,10 @@ On Linux, passwords are encrypted with the system keyring (GNOME Keyring / KWall
 <td><img src="docs/screenshots/07-player-settings.png" alt="Player settings"><br><sub><b>Player settings</b> — audio, subtitles, buffer, statistics</sub></td>
 </tr>
 <tr>
+<td><img src="docs/screenshots/15-multiview.png" alt="Multi-View"><br><sub><b>Multi-View</b> — four channels at once</sub></td>
+<td><img src="docs/screenshots/16-tv-mode.png" alt="TV mode"><br><sub><b>TV / remote mode</b> — big interface, arrow-key navigation</sub></td>
+</tr>
+<tr>
 <td><img src="docs/screenshots/08-movie.png" alt="Movie details"><br><sub><b>Movie details</b> — resume where you left off</sub></td>
 <td><img src="docs/screenshots/11-series.png" alt="Series details"><br><sub><b>Series</b> — seasons and episodes</sub></td>
 </tr>
@@ -108,7 +122,7 @@ On Linux, passwords are encrypted with the system keyring (GNOME Keyring / KWall
 </tr>
 </table>
 
-<sub>Screenshots use a demo server: freely available channels, public-domain classics and open Blender films. Posters are original placeholder artwork.</sub>
+<sub>Screenshots use the bundled mock server (`test/mock-server.js`): freely available channels, public-domain classics and open Blender films. Posters are original placeholder artwork.</sub>
 
 ## Keyboard shortcuts
 
@@ -139,6 +153,15 @@ npm run dist         # Windows installer (dist/)
 npm run dist:mac     # macOS builds (best run on a Mac)
 npm run dist:linux   # AppImage, .deb and .rpm (needs rpmbuild for .rpm)
 ```
+
+Run the end-to-end tests (real app + mock Xtream/M3U server):
+
+```bash
+npm test                 # Windows / macOS
+xvfb-run -a npm test     # Linux without a display
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the project layout and how to add translations.
 
 Built with [Electron](https://www.electronjs.org/), [mpegts.js](https://github.com/xqq/mpegts.js) and [hls.js](https://github.com/video-dev/hls.js). No framework, no build step for the UI — plain HTML, CSS and JavaScript in [`src/`](src).
 

@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions about your IPTV subscription
+    url: https://github.com/hakancatana/catana-iptv#disclaimer
+    about: Catana IPTV is a player only and does not provide channels. Please contact your provider about subscriptions and content.
