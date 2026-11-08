@@ -1,0 +1,80 @@
+{
+  "name": "catana-iptv",
+  "productName": "Catana IPTV",
+  "version": "1.3.1",
+  "description": "Catana IPTV — Xtream Codes desktop player",
+  "main": "main.js",
+  "author": "MHÇ",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis",
+    "dist:mac": "electron-builder --mac"
+  },
+  "dependencies": {
+    "hls.js": "^1.7.4",
+    "mpegts.js": "^1.8.2"
+  },
+  "devDependencies": {
+    "electron": "^45.2.3",
+    "electron-builder": "^26.18.0"
+  },
+  "build": {
+    "appId": "com.catana.iptv",
+    "productName": "Catana IPTV",
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "package.json",
+      "node_modules/hls.js/dist/hls.min.js",
+      "node_modules/mpegts.js/dist/mpegts.js"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "signAndEditExecutable": true,
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Catana IPTV",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "artifactName": "Catana-IPTV-Setup-${version}.exe",
+      "language": "1055",
+      "multiLanguageInstaller": false
+    },
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "publish": null,
+    "mac": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "public.app-category.entertainment",
+      "identity": null,
+      "hardenedRuntime": false,
+      "artifactName": "Catana-IPTV-${version}-mac-${arch}.${ext}"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hakancatana/catana-iptv.git"
+  },
+  "homepage": "https://github.com/hakancatana/catana-iptv"
+}

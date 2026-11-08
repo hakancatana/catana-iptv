@@ -1,0 +1,66 @@
+const { app, BrowserWindow, Menu, shell, ipcMain, safeStorage, powerSaveBlocker } = require('electron');
+const path = require('path');
+
+// Donanım destekliyse HEVC (H.265) çözmeyi aç — bazı 4K kanallar HEVC yayınlıyor.
+app.commandLine.appendSwitch('enable-features', 'PlatformHEVCDecoderSupport');
+// Film/dizi dosyalarında (mp4/mkv) çoklu ses dili seçimi için video.audioTracks API'si.
+app.commandLine.appendSwitch('enable-blink-features', 'AudioVideoTracks');
+// Canlı yayını 30 dk geri sarabilmek için MSE tampon sınırlarını büyüt (varsayılan ~150 MB).
+app.commandLine.appendSwitch('mse-video-buffer-size-limit-mb', '1500');
+app.commandLine.appendSwitch('mse-audio-buffer-size-limit-mb', '120');
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+
+// ---- şifreleme (Windows: DPAPI, macOS: Anahtar Zinciri)
+ipcMain.on('crypto:available', (e) => { e.returnValue = safeStorage.isEncryptionAvailable(); });
+ipcMain.on('crypto:encrypt', (e, text) => {
+  try { e.returnValue = safeStorage.encryptString(String(text)).toString('base64'); } catch { e.returnValue = null; }
+});
+ipcMain.on('crypto:decrypt', (e, b64) => {
+  try { e.returnValue = safeStorage.decryptString(Buffer.from(String(b64), 'base64')); } catch { e.returnValue = null; }
+});
+ipcMain.on('app:version', (e) => { e.returnValue = app.getVersion(); });
+
+// ---- izlerken ekran kararmasın / uyku olmasın
+let blocker = null;
+ipcMain.on('power:keepAwake', (e, on) => {
+  if (on && blocker === null) blocker = powerSaveBlocker.start('prevent-display-sleep');
+  if (!on && blocker !== null) { powerSaveBlocker.stop(blocker); blocker = null; }
+});
+
+ipcMain.on('shell:open', (e, url) => { if (/^https?:\/\//i.test(String(url))) shell.openExternal(url); });
+
+function createWindow() {
+  const win = new BrowserWindow({
+    width: 1440,
+    height: 900,
+    minWidth: 960,
+    minHeight: 600,
+    backgroundColor: '#0E1014',
+    title: 'Catana IPTV',
+    icon: path.join(__dirname, 'src', 'icon.png'),
+    autoHideMenuBar: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      // Xtream sunucuları CORS başlığı göndermez; masaüstü uygulamada bu kontrolü kapatıyoruz.
+      webSecurity: false,
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+  win.loadFile(path.join(__dirname, 'src', 'index.html'));
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//i.test(url)) shell.openExternal(url);
+    return { action: 'deny' };
+  });
+  win.webContents.on('before-input-event', (e, input) => {
+    if (input.type !== 'keyDown') return;
+    if (input.key === 'F12' || (isMac && input.meta && input.alt && input.key.toLowerCase() === 'i')) win.webContents.toggleDevTools();
+  });
+}
+
+const isMac = process.platform === 'darwin';
+// macOS'ta uygulama menüsü olmadan ⌘C/⌘V/⌘Q gibi kısayollar çalışmaz
+Menu.setApplicationMenu(isMac ? Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }, { role: 'windowMenu' }]) : null);
+app.whenReady().then(createWindow);
+app.on('window-all-closed', () => { if (!isMac) app.quit(); });
+app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });

@@ -1,0 +1,12 @@
+const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('native', {
+  // Windows'ta DPAPI ile şifreler: yalnızca bu Windows kullanıcısı çözebilir
+  canEncrypt: () => ipcRenderer.sendSync('crypto:available'),
+  encrypt: (text) => ipcRenderer.sendSync('crypto:encrypt', text),
+  decrypt: (b64) => ipcRenderer.sendSync('crypto:decrypt', b64),
+  keepAwake: (on) => ipcRenderer.send('power:keepAwake', !!on),
+  openExternal: (url) => ipcRenderer.send('shell:open', url),
+  platform: process.platform,
+  versions: { app: ipcRenderer.sendSync('app:version'), electron: process.versions.electron, chrome: process.versions.chrome }
+});

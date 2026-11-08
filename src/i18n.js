@@ -1,0 +1,400 @@
+'use strict';
+/* Catana IPTV — dil desteği
+   Arayüz Türkçe yazılır; seçili dil Türkçe değilse ekrandaki metinler bu sözlükle çevrilir.
+   Sıra: en, de, fr, es, it, ru, zh, hi */
+const LANG_ORDER = ['en', 'de', 'fr', 'es', 'it', 'ru', 'zh', 'hi'];
+const LANGS = [
+  { code: 'tr', name: 'Türkçe', loc: 'tr-TR' },
+  { code: 'en', name: 'English', loc: 'en-GB' },
+  { code: 'de', name: 'Deutsch', loc: 'de-DE' },
+  { code: 'fr', name: 'Français', loc: 'fr-FR' },
+  { code: 'es', name: 'Español', loc: 'es-ES' },
+  { code: 'it', name: 'Italiano', loc: 'it-IT' },
+  { code: 'ru', name: 'Русский', loc: 'ru-RU' },
+  { code: 'zh', name: '简体中文', loc: 'zh-CN' },
+  { code: 'hi', name: 'हिन्दी', loc: 'hi-IN' }
+];
+const FLAGS = {
+  tr: '<svg viewBox="0 0 30 20"><rect width="30" height="20" fill="#E30A17"/><circle cx="11" cy="10" r="5" fill="#fff"/><circle cx="12.3" cy="10" r="4" fill="#E30A17"/><path d="M16.2 10l3.9-1.3-2.4 3.3V8l2.4 3.3z" fill="#fff"/></svg>',
+  en: '<svg viewBox="0 0 30 20"><rect width="30" height="20" fill="#012169"/><path d="M0 0l30 20M30 0L0 20" stroke="#fff" stroke-width="4"/><path d="M0 0l30 20M30 0L0 20" stroke="#C8102E" stroke-width="1.6"/><path d="M15 0v20M0 10h30" stroke="#fff" stroke-width="6"/><path d="M15 0v20M0 10h30" stroke="#C8102E" stroke-width="3.4"/></svg>',
+  de: '<svg viewBox="0 0 30 20"><rect width="30" height="7" fill="#000"/><rect y="6.6" width="30" height="7" fill="#DD0000"/><rect y="13.3" width="30" height="6.7" fill="#FFCE00"/></svg>',
+  fr: '<svg viewBox="0 0 30 20"><rect width="10" height="20" fill="#0055A4"/><rect x="10" width="10" height="20" fill="#fff"/><rect x="20" width="10" height="20" fill="#EF4135"/></svg>',
+  es: '<svg viewBox="0 0 30 20"><rect width="30" height="20" fill="#AA151B"/><rect y="5" width="30" height="10" fill="#F1BF00"/></svg>',
+  it: '<svg viewBox="0 0 30 20"><rect width="10" height="20" fill="#009246"/><rect x="10" width="10" height="20" fill="#fff"/><rect x="20" width="10" height="20" fill="#CE2B37"/></svg>',
+  ru: '<svg viewBox="0 0 30 20"><rect width="30" height="7" fill="#fff"/><rect y="6.6" width="30" height="7" fill="#0039A6"/><rect y="13.3" width="30" height="6.7" fill="#D52B1E"/></svg>',
+  zh: '<svg viewBox="0 0 30 20"><rect width="30" height="20" fill="#DE2910"/><path d="M5 3.2l1.1 3.4H9.7L6.8 8.7l1.1 3.4L5 10l-2.9 2.1 1.1-3.4L.3 6.6h3.6z" fill="#FFDE00"/><circle cx="11" cy="2.5" r=".9" fill="#FFDE00"/><circle cx="13" cy="4.8" r=".9" fill="#FFDE00"/><circle cx="13" cy="7.8" r=".9" fill="#FFDE00"/><circle cx="11" cy="10" r=".9" fill="#FFDE00"/></svg>',
+  hi: '<svg viewBox="0 0 30 20"><rect width="30" height="7" fill="#FF9933"/><rect y="6.6" width="30" height="7" fill="#fff"/><rect y="13.3" width="30" height="6.7" fill="#138808"/><circle cx="15" cy="10" r="2.6" fill="none" stroke="#000080" stroke-width=".7"/><circle cx="15" cy="10" r=".5" fill="#000080"/></svg>'
+};
+
+// Türkçe metin → [en, de, fr, es, it, ru, zh, hi]
+const DICT = {
+  // --- menü / genel
+  'Menü': ['Menu', 'Menü', 'Menu', 'Menú', 'Menu', 'Меню', '菜单', 'मेनू'],
+  'Anasayfa': ['Home', 'Startseite', 'Accueil', 'Inicio', 'Home', 'Главная', '首页', 'होम'],
+  'Canlı TV': ['Live TV', 'Live-TV', 'TV en direct', 'TV en directo', 'TV in diretta', 'ТВ онлайн', '直播电视', 'लाइव टीवी'],
+  'TV Rehberi': ['TV Guide', 'TV-Programm', 'Guide TV', 'Guía de TV', 'Guida TV', 'Телепрограмма', '电视节目单', 'टीवी गाइड'],
+  'Filmler': ['Movies', 'Filme', 'Films', 'Películas', 'Film', 'Фильмы', '电影', 'फ़िल्में'],
+  'Diziler': ['Series', 'Serien', 'Séries', 'Series', 'Serie TV', 'Сериалы', '剧集', 'सीरीज़'],
+  'Favoriler': ['Favourites', 'Favoriten', 'Favoris', 'Favoritos', 'Preferiti', 'Избранное', '收藏', 'पसंदीदा'],
+  'Son İzlenenler': ['Recently Watched', 'Zuletzt gesehen', 'Vus récemment', 'Vistos recientemente', 'Visti di recente', 'Недавно просмотренные', '最近观看', 'हाल ही में देखा'],
+  'Yenile': ['Refresh', 'Aktualisieren', 'Actualiser', 'Actualizar', 'Aggiorna', 'Обновить', '刷新', 'रीफ़्रेश'],
+  'Ayarlar': ['Settings', 'Einstellungen', 'Paramètres', 'Ajustes', 'Impostazioni', 'Настройки', '设置', 'सेटिंग्स'],
+  'Ayarlar (S)': ['Settings (S)', 'Einstellungen (S)', 'Paramètres (S)', 'Ajustes (S)', 'Impostazioni (S)', 'Настройки (S)', '设置 (S)', 'सेटिंग्स (S)'],
+  'Hesabım': ['My Account', 'Mein Konto', 'Mon compte', 'Mi cuenta', 'Il mio account', 'Мой аккаунт', '我的账户', 'मेरा खाता'],
+  'Arama': ['Search', 'Suche', 'Recherche', 'Búsqueda', 'Ricerca', 'Поиск', '搜索', 'खोज'],
+  'Ara': ['Search', 'Suchen', 'Rechercher', 'Buscar', 'Cerca', 'Поиск', '搜索', 'खोजें'],
+  'Kanal, film veya dizi ara…': ['Search channels, movies or series…', 'Sender, Filme oder Serien suchen…', 'Rechercher chaînes, films ou séries…', 'Buscar canales, películas o series…', 'Cerca canali, film o serie…', 'Поиск каналов, фильмов или сериалов…', '搜索频道、电影或剧集…', 'चैनल, फ़िल्म या सीरीज़ खोजें…'],
+  'Kanal, film ve dizi listelerini sunucudan yeniden çek': ['Reload channel, movie and series lists from the server', 'Sender-, Film- und Serienlisten neu vom Server laden', 'Recharger les listes depuis le serveur', 'Volver a cargar las listas desde el servidor', 'Ricarica gli elenchi dal server', 'Заново загрузить списки с сервера', '从服务器重新加载列表', 'सर्वर से सूचियाँ फिर से लोड करें'],
+  'Sıralama': ['Sort', 'Sortierung', 'Tri', 'Orden', 'Ordinamento', 'Сортировка', '排序', 'क्रम'],
+  'Sırala: Eklenme tarihi': ['Sort: Date added', 'Sortieren: Hinzugefügt', 'Trier : date d’ajout', 'Ordenar: fecha de alta', 'Ordina: data aggiunta', 'Сортировка: по дате', '排序：添加日期', 'क्रम: जोड़ने की तिथि'],
+  'Sırala: A–Z': ['Sort: A–Z', 'Sortieren: A–Z', 'Trier : A–Z', 'Ordenar: A–Z', 'Ordina: A–Z', 'Сортировка: А–Я', '排序：A–Z', 'क्रम: A–Z'],
+  'Sırala: Puan': ['Sort: Rating', 'Sortieren: Bewertung', 'Trier : note', 'Ordenar: valoración', 'Ordina: voto', 'Сортировка: рейтинг', '排序：评分', 'क्रम: रेटिंग'],
+  'Liste görünümü': ['List view', 'Listenansicht', 'Vue liste', 'Vista de lista', 'Vista elenco', 'Список', '列表视图', 'सूची दृश्य'],
+  'Izgara görünümü': ['Grid view', 'Rasteransicht', 'Vue grille', 'Vista de cuadrícula', 'Vista griglia', 'Сетка', '网格视图', 'ग्रिड दृश्य'],
+  'Bölümler': ['Episodes', 'Folgen', 'Épisodes', 'Episodios', 'Episodi', 'Серии', '剧集列表', 'एपिसोड'],
+  'Kategoriler': ['Categories', 'Kategorien', 'Catégories', 'Categorías', 'Categorie', 'Категории', '分类', 'श्रेणियाँ'],
+  'Kanallar': ['Channels', 'Sender', 'Chaînes', 'Canales', 'Canali', 'Каналы', '频道', 'चैनल'],
+  'Tümü': ['All', 'Alle', 'Tout', 'Todo', 'Tutti', 'Все', '全部', 'सभी'],
+  'Hepsi': ['All', 'Alle', 'Tout', 'Todo', 'Tutti', 'Все', '全部', 'सभी'],
+  'Kilitli': ['Locked', 'Gesperrt', 'Verrouillé', 'Bloqueado', 'Bloccato', 'Заблокировано', '已锁定', 'लॉक'],
+  'Favori': ['Favourite', 'Favorit', 'Favori', 'Favorito', 'Preferito', 'В избранное', '收藏', 'पसंदीदा'],
+  'Yükleniyor…': ['Loading…', 'Wird geladen…', 'Chargement…', 'Cargando…', 'Caricamento…', 'Загрузка…', '加载中…', 'लोड हो रहा है…'],
+  'Kanallar yükleniyor…': ['Loading channels…', 'Sender werden geladen…', 'Chargement des chaînes…', 'Cargando canales…', 'Caricamento canali…', 'Загрузка каналов…', '正在加载频道…', 'चैनल लोड हो रहे हैं…'],
+  'Filmler yükleniyor…': ['Loading movies…', 'Filme werden geladen…', 'Chargement des films…', 'Cargando películas…', 'Caricamento film…', 'Загрузка фильмов…', '正在加载电影…', 'फ़िल्में लोड हो रही हैं…'],
+  'Diziler yükleniyor…': ['Loading series…', 'Serien werden geladen…', 'Chargement des séries…', 'Cargando series…', 'Caricamento serie…', 'Загрузка сериалов…', '正在加载剧集…', 'सीरीज़ लोड हो रही हैं…'],
+  'Bağlanılıyor…': ['Connecting…', 'Verbinden…', 'Connexion…', 'Conectando…', 'Connessione…', 'Подключение…', '正在连接…', 'कनेक्ट हो रहा है…'],
+  'Güncel içerik alınıyor…': ['Fetching latest content…', 'Aktuelle Inhalte werden geladen…', 'Récupération du contenu…', 'Obteniendo contenido…', 'Recupero contenuti…', 'Получение контента…', '正在获取最新内容…', 'नवीनतम सामग्री लाई जा रही है…'],
+  'Listeler güncellendi': ['Lists updated', 'Listen aktualisiert', 'Listes mises à jour', 'Listas actualizadas', 'Elenchi aggiornati', 'Списки обновлены', '列表已更新', 'सूचियाँ अपडेट हुईं'],
+  'Tekrar dene': ['Try again', 'Erneut versuchen', 'Réessayer', 'Reintentar', 'Riprova', 'Повторить', '重试', 'फिर से कोशिश करें'],
+  'Geri': ['Back', 'Zurück', 'Retour', 'Atrás', 'Indietro', 'Назад', '返回', 'वापस'],
+  'Kapat': ['Close', 'Schließen', 'Fermer', 'Cerrar', 'Chiudi', 'Закрыть', '关闭', 'बंद करें'],
+  'Kaydet': ['Save', 'Speichern', 'Enregistrer', 'Guardar', 'Salva', 'Сохранить', '保存', 'सहेजें'],
+  'Kaydedildi': ['Saved', 'Gespeichert', 'Enregistré', 'Guardado', 'Salvato', 'Сохранено', '已保存', 'सहेजा गया'],
+  'Vazgeç': ['Cancel', 'Abbrechen', 'Annuler', 'Cancelar', 'Annulla', 'Отмена', '取消', 'रद्द करें'],
+  'Onayla': ['Confirm', 'Bestätigen', 'Valider', 'Confirmar', 'Conferma', 'Подтвердить', '确认', 'पुष्टि करें'],
+  'Düzenle': ['Edit', 'Bearbeiten', 'Modifier', 'Editar', 'Modifica', 'Изменить', '编辑', 'संपादित करें'],
+  'Sil': ['Delete', 'Löschen', 'Supprimer', 'Eliminar', 'Elimina', 'Удалить', '删除', 'हटाएँ'],
+  'Önceki': ['Previous', 'Zurück', 'Précédent', 'Anterior', 'Precedente', 'Назад', '上一个', 'पिछला'],
+  'Sonraki': ['Next', 'Weiter', 'Suivant', 'Siguiente', 'Successivo', 'Далее', '下一个', 'अगला'],
+  // --- giriş
+  'Kayıtlı profiller': ['Saved profiles', 'Gespeicherte Profile', 'Profils enregistrés', 'Perfiles guardados', 'Profili salvati', 'Сохранённые профили', '已保存的配置', 'सहेजी गई प्रोफ़ाइलें'],
+  'Birden fazla Xtream hesabını kaydet, tek tıkla geçiş yap.': ['Save several Xtream accounts and switch with one click.', 'Mehrere Xtream-Konten speichern und mit einem Klick wechseln.', 'Enregistrez plusieurs comptes Xtream et changez en un clic.', 'Guarda varias cuentas Xtream y cambia con un clic.', 'Salva più account Xtream e passa dall’uno all’altro con un clic.', 'Сохраняйте несколько аккаунтов Xtream и переключайтесь одним щелчком.', '保存多个 Xtream 账户，一键切换。', 'कई Xtream खाते सहेजें और एक क्लिक में बदलें।'],
+  'Geri dön': ['Go back', 'Zurück', 'Retour', 'Volver', 'Torna indietro', 'Вернуться', '返回', 'वापस जाएँ'],
+  'Bilgiler yalnızca bu bilgisayarda saklanır.': ['Details are stored only on this computer.', 'Daten werden nur auf diesem Computer gespeichert.', 'Les informations sont stockées uniquement sur cet ordinateur.', 'Los datos se guardan solo en este ordenador.', 'I dati sono salvati solo su questo computer.', 'Данные хранятся только на этом компьютере.', '信息仅保存在本机。', 'जानकारी केवल इसी कंप्यूटर पर सहेजी जाती है।'],
+  'Xtream Codes ile bağlan': ['Connect with Xtream Codes', 'Mit Xtream Codes verbinden', 'Se connecter avec Xtream Codes', 'Conectar con Xtream Codes', 'Connetti con Xtream Codes', 'Подключение через Xtream Codes', '使用 Xtream Codes 连接', 'Xtream Codes से कनेक्ट करें'],
+  'Sağlayıcının verdiği sunucu adresini ve hesap bilgilerini gir.': ['Enter the server address and account details from your provider.', 'Serveradresse und Zugangsdaten deines Anbieters eingeben.', 'Saisissez l’adresse du serveur et les identifiants fournis.', 'Introduce la dirección del servidor y los datos de tu proveedor.', 'Inserisci l’indirizzo del server e i dati forniti dal provider.', 'Введите адрес сервера и данные аккаунта от провайдера.', '输入服务商提供的服务器地址和账户信息。', 'अपने प्रदाता का सर्वर पता और खाता विवरण दर्ज करें।'],
+  'Profil adı': ['Profile name', 'Profilname', 'Nom du profil', 'Nombre del perfil', 'Nome profilo', 'Имя профиля', '配置名称', 'प्रोफ़ाइल नाम'],
+  'Örn. Ev Profili': ['e.g. Home', 'z. B. Zuhause', 'ex. Maison', 'p. ej. Casa', 'es. Casa', 'напр. Дом', '例如：家里', 'उदा. घर'],
+  'Sunucu adresi': ['Server address', 'Serveradresse', 'Adresse du serveur', 'Dirección del servidor', 'Indirizzo server', 'Адрес сервера', '服务器地址', 'सर्वर पता'],
+  'Kullanıcı adı': ['Username', 'Benutzername', 'Nom d’utilisateur', 'Usuario', 'Nome utente', 'Имя пользователя', '用户名', 'उपयोगकर्ता नाम'],
+  'Şifre': ['Password', 'Passwort', 'Mot de passe', 'Contraseña', 'Password', 'Пароль', '密码', 'पासवर्ड'],
+  'Şifreyi göster': ['Show password', 'Passwort anzeigen', 'Afficher le mot de passe', 'Mostrar contraseña', 'Mostra password', 'Показать пароль', '显示密码', 'पासवर्ड दिखाएँ'],
+  'Açılışta bu profille otomatik bağlan': ['Connect automatically with this profile at startup', 'Beim Start automatisch mit diesem Profil verbinden', 'Se connecter automatiquement avec ce profil au démarrage', 'Conectar automáticamente con este perfil al iniciar', 'Connetti automaticamente con questo profilo all’avvio', 'Автоматически подключаться при запуске', '启动时自动使用此配置连接', 'शुरू होने पर इस प्रोफ़ाइल से अपने-आप कनेक्ट करें'],
+  'Bağlan ve kaydet': ['Connect and save', 'Verbinden und speichern', 'Se connecter et enregistrer', 'Conectar y guardar', 'Connetti e salva', 'Подключить и сохранить', '连接并保存', 'कनेक्ट करें और सहेजें'],
+  'Bağlantıyı test et': ['Test connection', 'Verbindung testen', 'Tester la connexion', 'Probar conexión', 'Prova connessione', 'Проверить подключение', '测试连接', 'कनेक्शन जाँचें'],
+  'Profili düzenle': ['Edit profile', 'Profil bearbeiten', 'Modifier le profil', 'Editar perfil', 'Modifica profilo', 'Изменить профиль', '编辑配置', 'प्रोफ़ाइल संपादित करें'],
+  'Henüz kayıtlı profil yok.': ['No saved profiles yet.', 'Noch keine gespeicherten Profile.', 'Aucun profil enregistré.', 'Aún no hay perfiles guardados.', 'Nessun profilo salvato.', 'Сохранённых профилей пока нет.', '尚无已保存的配置。', 'अभी कोई सहेजी गई प्रोफ़ाइल नहीं।'],
+  'Test ediliyor…': ['Testing…', 'Wird getestet…', 'Test en cours…', 'Probando…', 'Verifica in corso…', 'Проверка…', '正在测试…', 'जाँच हो रही है…'],
+  'Sunucu adresi, kullanıcı adı ve şifre gerekli.': ['Server address, username and password are required.', 'Serveradresse, Benutzername und Passwort sind erforderlich.', 'Adresse du serveur, nom d’utilisateur et mot de passe requis.', 'Se requieren servidor, usuario y contraseña.', 'Servono indirizzo server, nome utente e password.', 'Нужны адрес сервера, имя пользователя и пароль.', '需要服务器地址、用户名和密码。', 'सर्वर पता, उपयोगकर्ता नाम और पासवर्ड आवश्यक हैं।'],
+  'Kullanıcı adı veya şifre hatalı.': ['Wrong username or password.', 'Benutzername oder Passwort falsch.', 'Nom d’utilisateur ou mot de passe incorrect.', 'Usuario o contraseña incorrectos.', 'Nome utente o password errati.', 'Неверное имя пользователя или пароль.', '用户名或密码错误。', 'उपयोगकर्ता नाम या पासवर्ड गलत है।'],
+  'Sunucu yanıt vermedi (zaman aşımı).': ['The server did not respond (timeout).', 'Der Server antwortet nicht (Zeitüberschreitung).', 'Le serveur ne répond pas (délai dépassé).', 'El servidor no respondió (tiempo agotado).', 'Il server non risponde (timeout).', 'Сервер не ответил (тайм-аут).', '服务器无响应（超时）。', 'सर्वर ने जवाब नहीं दिया (टाइमआउट)।'],
+  'Sunucuya ulaşılamadı. Adresi ve internet bağlantını kontrol et.': ['Could not reach the server. Check the address and your internet connection.', 'Server nicht erreichbar. Adresse und Internetverbindung prüfen.', 'Serveur injoignable. Vérifiez l’adresse et votre connexion.', 'No se pudo conectar al servidor. Revisa la dirección y tu conexión.', 'Server non raggiungibile. Controlla indirizzo e connessione.', 'Не удалось подключиться к серверу. Проверьте адрес и интернет.', '无法连接服务器。请检查地址和网络。', 'सर्वर तक नहीं पहुँच सके। पता और इंटरनेट जाँचें।'],
+  'Sunucudan geçersiz yanıt geldi. Adresi kontrol et.': ['The server sent an invalid response. Check the address.', 'Ungültige Serverantwort. Adresse prüfen.', 'Réponse du serveur invalide. Vérifiez l’adresse.', 'Respuesta no válida del servidor. Revisa la dirección.', 'Risposta del server non valida. Controlla l’indirizzo.', 'Неверный ответ сервера. Проверьте адрес.', '服务器响应无效。请检查地址。', 'सर्वर से अमान्य जवाब मिला। पता जाँचें।'],
+  'sınırsız': ['unlimited', 'unbegrenzt', 'illimité', 'ilimitado', 'illimitato', 'без ограничений', '无限期', 'असीमित'],
+  // --- canlı tv / önizleme
+  'Henüz favori kanal yok. Kanal kartındaki yıldızla ekleyebilirsin.': ['No favourite channels yet. Add them with the star on a channel card.', 'Noch keine Lieblingssender. Mit dem Stern auf der Senderkarte hinzufügen.', 'Pas encore de chaîne favorite. Ajoutez-en avec l’étoile.', 'Aún no hay canales favoritos. Añádelos con la estrella.', 'Nessun canale preferito. Aggiungili con la stella.', 'Избранных каналов пока нет. Добавьте их звёздочкой.', '还没有收藏频道。点击频道卡片上的星标添加。', 'अभी कोई पसंदीदा चैनल नहीं। चैनल कार्ड के तारे से जोड़ें।'],
+  'Kanal bulunamadı.': ['No channels found.', 'Keine Sender gefunden.', 'Aucune chaîne trouvée.', 'No se encontraron canales.', 'Nessun canale trovato.', 'Каналы не найдены.', '未找到频道。', 'कोई चैनल नहीं मिला।'],
+  'Önizlemek için soldan bir kanal seç.': ['Pick a channel on the left to preview.', 'Links einen Sender für die Vorschau wählen.', 'Choisissez une chaîne à gauche pour l’aperçu.', 'Elige un canal a la izquierda para previsualizar.', 'Scegli un canale a sinistra per l’anteprima.', 'Выберите канал слева для предпросмотра.', '从左侧选择频道进行预览。', 'पूर्वावलोकन के लिए बाईं ओर से चैनल चुनें।'],
+  'Çift tık veya Enter: tam ekran.': ['Double-click or Enter: full screen.', 'Doppelklick oder Enter: Vollbild.', 'Double-clic ou Entrée : plein écran.', 'Doble clic o Intro: pantalla completa.', 'Doppio clic o Invio: schermo intero.', 'Двойной щелчок или Enter: полный экран.', '双击或回车：全屏。', 'डबल-क्लिक या Enter: फ़ुल स्क्रीन।'],
+  'Tam ekran izle': ['Watch full screen', 'Im Vollbild ansehen', 'Regarder en plein écran', 'Ver en pantalla completa', 'Guarda a schermo intero', 'Смотреть на весь экран', '全屏观看', 'फ़ुल स्क्रीन में देखें'],
+  '★ Favoride': ['★ In favourites', '★ In Favoriten', '★ Dans les favoris', '★ En favoritos', '★ Nei preferiti', '★ В избранном', '★ 已收藏', '★ पसंदीदा में'],
+  '☆ Favorilere ekle': ['☆ Add to favourites', '☆ Zu Favoriten', '☆ Ajouter aux favoris', '☆ Añadir a favoritos', '☆ Aggiungi ai preferiti', '☆ В избранное', '☆ 加入收藏', '☆ पसंदीदा में जोड़ें'],
+  'Yayın akışı': ['Schedule', 'Programm', 'Programme', 'Programación', 'Palinsesto', 'Программа', '节目表', 'कार्यक्रम'],
+  'Bu kanal için yayın akışı yok.': ['No schedule for this channel.', 'Kein Programm für diesen Sender.', 'Pas de programme pour cette chaîne.', 'No hay programación para este canal.', 'Nessun palinsesto per questo canale.', 'Для этого канала нет программы.', '该频道暂无节目表。', 'इस चैनल का कार्यक्रम उपलब्ध नहीं।'],
+  'CANLI': ['LIVE', 'LIVE', 'DIRECT', 'EN DIRECTO', 'DIRETTA', 'ЭФИР', '直播', 'लाइव'],
+  // --- film / dizi
+  'İzlemeye devam et': ['Continue watching', 'Weiterschauen', 'Reprendre', 'Seguir viendo', 'Continua a guardare', 'Продолжить просмотр', '继续观看', 'देखना जारी रखें'],
+  'Film bulunamadı.': ['No movies found.', 'Keine Filme gefunden.', 'Aucun film trouvé.', 'No se encontraron películas.', 'Nessun film trovato.', 'Фильмы не найдены.', '未找到电影。', 'कोई फ़िल्म नहीं मिली।'],
+  'Dizi bulunamadı.': ['No series found.', 'Keine Serien gefunden.', 'Aucune série trouvée.', 'No se encontraron series.', 'Nessuna serie trovata.', 'Сериалы не найдены.', '未找到剧集。', 'कोई सीरीज़ नहीं मिली।'],
+  'Dizi': ['Series', 'Serie', 'Série', 'Serie', 'Serie', 'Сериал', '剧集', 'सीरीज़'],
+  'Bu sezonda bölüm yok.': ['No episodes in this season.', 'Keine Folgen in dieser Staffel.', 'Aucun épisode dans cette saison.', 'No hay episodios en esta temporada.', 'Nessun episodio in questa stagione.', 'В этом сезоне нет серий.', '本季暂无剧集。', 'इस सीज़न में कोई एपिसोड नहीं।'],
+  'Henüz favori yok. Kanal, film ve dizilerdeki yıldızla ekleyebilirsin.': ['No favourites yet. Use the star on channels, movies and series.', 'Noch keine Favoriten. Nutze den Stern bei Sendern, Filmen und Serien.', 'Pas encore de favoris. Utilisez l’étoile sur les chaînes, films et séries.', 'Aún no hay favoritos. Usa la estrella en canales, películas y series.', 'Nessun preferito. Usa la stella su canali, film e serie.', 'Избранного пока нет. Используйте звёздочку.', '还没有收藏。点击频道、电影和剧集上的星标添加。', 'अभी कोई पसंदीदा नहीं। चैनल, फ़िल्मों और सीरीज़ पर तारे का उपयोग करें।'],
+  'Film ve diziler': ['Movies & series', 'Filme & Serien', 'Films et séries', 'Películas y series', 'Film e serie', 'Фильмы и сериалы', '电影和剧集', 'फ़िल्में और सीरीज़'],
+  'Henüz bir şey izlemedin.': ['You haven’t watched anything yet.', 'Du hast noch nichts angesehen.', 'Vous n’avez encore rien regardé.', 'Aún no has visto nada.', 'Non hai ancora guardato nulla.', 'Вы ещё ничего не смотрели.', '你还没有观看任何内容。', 'आपने अभी तक कुछ नहीं देखा।'],
+  'Geçmişi temizle': ['Clear history', 'Verlauf löschen', 'Effacer l’historique', 'Borrar historial', 'Cancella cronologia', 'Очистить историю', '清除记录', 'इतिहास साफ़ करें'],
+  'Tümünü gör ›': ['See all ›', 'Alle anzeigen ›', 'Tout voir ›', 'Ver todo ›', 'Vedi tutto ›', 'Все ›', '查看全部 ›', 'सभी देखें ›'],
+  'Tümünü göster ›': ['Show all ›', 'Alle anzeigen ›', 'Tout afficher ›', 'Mostrar todo ›', 'Mostra tutto ›', 'Показать все ›', '显示全部 ›', 'सभी दिखाएँ ›'],
+  'Son eklenen filmler': ['Recently added movies', 'Neu hinzugefügte Filme', 'Films ajoutés récemment', 'Películas añadidas recientemente', 'Film aggiunti di recente', 'Новые фильмы', '最新添加的电影', 'हाल में जोड़ी गई फ़िल्में'],
+  'Son güncellenen diziler': ['Recently updated series', 'Kürzlich aktualisierte Serien', 'Séries mises à jour récemment', 'Series actualizadas recientemente', 'Serie aggiornate di recente', 'Обновлённые сериалы', '最近更新的剧集', 'हाल में अपडेट हुई सीरीज़'],
+  'Favori kanallar': ['Favourite channels', 'Lieblingssender', 'Chaînes favorites', 'Canales favoritos', 'Canali preferiti', 'Избранные каналы', '收藏的频道', 'पसंदीदा चैनल'],
+  'Henüz içerik yok.': ['No content yet.', 'Noch keine Inhalte.', 'Pas encore de contenu.', 'Aún no hay contenido.', 'Nessun contenuto.', 'Контента пока нет.', '暂无内容。', 'अभी कोई सामग्री नहीं।'],
+  'Yeni film': ['New movie', 'Neuer Film', 'Nouveau film', 'Película nueva', 'Nuovo film', 'Новый фильм', '新电影', 'नई फ़िल्म'],
+  'Yeni dizi': ['New series', 'Neue Serie', 'Nouvelle série', 'Serie nueva', 'Nuova serie', 'Новый сериал', '新剧集', 'नई सीरीज़'],
+  'İzle': ['Watch', 'Ansehen', 'Regarder', 'Ver', 'Guarda', 'Смотреть', '观看', 'देखें'],
+  '▶ İzle': ['▶ Watch', '▶ Ansehen', '▶ Regarder', '▶ Ver', '▶ Guarda', '▶ Смотреть', '▶ 观看', '▶ देखें'],
+  'Detaylar': ['Details', 'Details', 'Détails', 'Detalles', 'Dettagli', 'Подробнее', '详情', 'विवरण'],
+  'Yönetmen': ['Director', 'Regie', 'Réalisateur', 'Director', 'Regia', 'Режиссёр', '导演', 'निर्देशक'],
+  'Oyuncular': ['Cast', 'Besetzung', 'Distribution', 'Reparto', 'Cast', 'В ролях', '演员', 'कलाकार'],
+  'Baştan başla': ['Start over', 'Von vorne', 'Reprendre au début', 'Desde el principio', 'Ricomincia', 'С начала', '从头开始', 'शुरू से'],
+  'Fragman': ['Trailer', 'Trailer', 'Bande-annonce', 'Tráiler', 'Trailer', 'Трейлер', '预告片', 'ट्रेलर'],
+  'Arama sonuçları': ['Search results', 'Suchergebnisse', 'Résultats', 'Resultados', 'Risultati', 'Результаты поиска', '搜索结果', 'खोज परिणाम'],
+  // --- tv rehberi
+  'Yayın akışı bilgisi yok': ['No schedule information', 'Keine Programminformationen', 'Pas d’informations de programme', 'Sin información de programación', 'Nessuna informazione sul palinsesto', 'Нет данных о программе', '暂无节目信息', 'कार्यक्रम जानकारी नहीं'],
+  'Favori kanal yok.': ['No favourite channels.', 'Keine Lieblingssender.', 'Aucune chaîne favorite.', 'No hay canales favoritos.', 'Nessun canale preferito.', 'Нет избранных каналов.', '没有收藏的频道。', 'कोई पसंदीदा चैनल नहीं।'],
+  'Kanal yok.': ['No channels.', 'Keine Sender.', 'Aucune chaîne.', 'No hay canales.', 'Nessun canale.', 'Нет каналов.', '没有频道。', 'कोई चैनल नहीं।'],
+  'Bu kategoride kanal yok.': ['No channels in this category.', 'Keine Sender in dieser Kategorie.', 'Aucune chaîne dans cette catégorie.', 'No hay canales en esta categoría.', 'Nessun canale in questa categoria.', 'В этой категории нет каналов.', '此分类下没有频道。', 'इस श्रेणी में कोई चैनल नहीं।'],
+  '▶ Şimdi izle': ['▶ Watch now', '▶ Jetzt ansehen', '▶ Regarder maintenant', '▶ Ver ahora', '▶ Guarda ora', '▶ Смотреть сейчас', '▶ 立即观看', '▶ अभी देखें'],
+  'Kanalı aç': ['Open channel', 'Sender öffnen', 'Ouvrir la chaîne', 'Abrir canal', 'Apri canale', 'Открыть канал', '打开频道', 'चैनल खोलें'],
+  // --- ayarlar
+  'Canlı yayın formatı': ['Live stream format', 'Live-Stream-Format', 'Format du direct', 'Formato de directo', 'Formato diretta', 'Формат прямого эфира', '直播格式', 'लाइव स्ट्रीम फ़ॉर्मेट'],
+  'Otomatik önce TS dener, açılmazsa HLS\'e geçer. Takılan kanallarda diğerini dene.': ['Automatic tries TS first and falls back to HLS. If a channel stutters, try the other one.', 'Automatisch versucht zuerst TS, dann HLS. Bei Rucklern das andere probieren.', 'Automatique essaie TS puis HLS. Si une chaîne saccade, essayez l’autre.', 'Automático prueba TS y luego HLS. Si un canal se corta, prueba el otro.', 'Automatico prova TS e poi HLS. Se un canale scatta, prova l’altro.', 'Автоматически: сначала TS, затем HLS. Если канал тормозит, попробуйте другой.', '自动模式先尝试 TS，失败则切换 HLS。频道卡顿时可尝试另一种。', 'ऑटो पहले TS आज़माता है, फिर HLS। चैनल अटके तो दूसरा आज़माएँ।'],
+  'Otomatik': ['Automatic', 'Automatisch', 'Automatique', 'Automático', 'Automatico', 'Автоматически', '自动', 'स्वचालित'],
+  'Yayın önbelleği': ['Stream buffer', 'Stream-Puffer', 'Mémoire tampon', 'Búfer de emisión', 'Buffer di streaming', 'Буфер потока', '缓冲', 'स्ट्रीम बफ़र'],
+  'Az: daha düşük gecikme. Fazla: zayıf bağlantıda daha az takılma.': ['Low: less delay. High: fewer stutters on weak connections.', 'Gering: weniger Verzögerung. Hoch: weniger Ruckler bei schwacher Verbindung.', 'Faible : moins de retard. Élevé : moins de coupures sur connexion faible.', 'Bajo: menos retraso. Alto: menos cortes con conexión débil.', 'Basso: meno ritardo. Alto: meno scatti con connessione debole.', 'Мало: меньше задержка. Много: меньше рывков при слабой связи.', '少：延迟更低。多：弱网时更少卡顿。', 'कम: कम देरी। ज़्यादा: कमज़ोर कनेक्शन पर कम रुकावट।'],
+  'Az': ['Low', 'Gering', 'Faible', 'Bajo', 'Basso', 'Мало', '少', 'कम'],
+  'Normal': ['Normal', 'Normal', 'Normal', 'Normal', 'Normale', 'Обычный', '正常', 'सामान्य'],
+  'Fazla': ['High', 'Hoch', 'Élevé', 'Alto', 'Alto', 'Много', '多', 'ज़्यादा'],
+  'Canlı TV görünümü': ['Live TV view', 'Live-TV-Ansicht', 'Affichage TV en direct', 'Vista de TV en directo', 'Vista TV in diretta', 'Вид ТВ онлайн', '直播电视视图', 'लाइव टीवी दृश्य'],
+  'Logo ızgarası': ['Logo grid', 'Logo-Raster', 'Grille de logos', 'Cuadrícula de logos', 'Griglia loghi', 'Сетка логотипов', '台标网格', 'लोगो ग्रिड'],
+  'Liste + önizleme': ['List + preview', 'Liste + Vorschau', 'Liste + aperçu', 'Lista + vista previa', 'Elenco + anteprima', 'Список + предпросмотр', '列表 + 预览', 'सूची + पूर्वावलोकन'],
+  'Vurgu rengi': ['Accent colour', 'Akzentfarbe', 'Couleur d’accent', 'Color de acento', 'Colore di accento', 'Цвет акцента', '强调色', 'एक्सेंट रंग'],
+  'Profil ve veriler': ['Profile and data', 'Profil und Daten', 'Profil et données', 'Perfil y datos', 'Profilo e dati', 'Профиль и данные', '配置与数据', 'प्रोफ़ाइल और डेटा'],
+  'Aktif profil:': ['Active profile:', 'Aktives Profil:', 'Profil actif :', 'Perfil activo:', 'Profilo attivo:', 'Активный профиль:', '当前配置：', 'सक्रिय प्रोफ़ाइल:'],
+  'Profilleri yönet': ['Manage profiles', 'Profile verwalten', 'Gérer les profils', 'Gestionar perfiles', 'Gestisci profili', 'Управление профилями', '管理配置', 'प्रोफ़ाइलें प्रबंधित करें'],
+  'Listeleri sunucudan yenile': ['Reload lists from server', 'Listen vom Server neu laden', 'Recharger les listes', 'Recargar listas del servidor', 'Ricarica elenchi dal server', 'Обновить списки с сервера', '从服务器重新加载列表', 'सर्वर से सूचियाँ फिर लोड करें'],
+  'Dil': ['Language', 'Sprache', 'Langue', 'Idioma', 'Lingua', 'Язык', '语言', 'भाषा'],
+  'Seçtiğin dil, Kaydet\'e basınca uygulanır.': ['The selected language is applied when you press Save.', 'Die gewählte Sprache wird beim Speichern übernommen.', 'La langue choisie s’applique après Enregistrer.', 'El idioma elegido se aplica al pulsar Guardar.', 'La lingua scelta si applica premendo Salva.', 'Выбранный язык применяется после нажатия «Сохранить».', '点击保存后应用所选语言。', 'सहेजें दबाने पर चुनी गई भाषा लागू होगी।'],
+  'Kısayollar — Oynatıcı: Boşluk oynat/duraklat · ↑↓ kanal · ←→ 10 sn · L canlıya dön · F tam ekran · M ses · S ayarlar · C kanal listesi · Esc geri. Genel: Ctrl+K arama · F12 geliştirici araçları.': ['Shortcuts — Player: Space play/pause · ↑↓ channel · ←→ 10 s · L go live · F full screen · M mute · S settings · C channel list · Esc back. General: Ctrl+K search · F12 developer tools.', 'Tastenkürzel — Player: Leertaste Wiedergabe/Pause · ↑↓ Sender · ←→ 10 s · L live · F Vollbild · M Ton · S Einstellungen · C Senderliste · Esc zurück. Allgemein: Strg+K Suche · F12 Entwicklertools.', 'Raccourcis — Lecteur : Espace lecture/pause · ↑↓ chaîne · ←→ 10 s · L direct · F plein écran · M son · S paramètres · C chaînes · Échap retour. Général : Ctrl+K recherche · F12 outils de développement.', 'Atajos — Reproductor: Espacio reproducir/pausa · ↑↓ canal · ←→ 10 s · L directo · F pantalla completa · M sonido · S ajustes · C canales · Esc atrás. General: Ctrl+K buscar · F12 herramientas de desarrollo.', 'Scorciatoie — Player: Spazio play/pausa · ↑↓ canale · ←→ 10 s · L diretta · F schermo intero · M audio · S impostazioni · C canali · Esc indietro. Generale: Ctrl+K cerca · F12 strumenti sviluppatore.', 'Горячие клавиши — Плеер: Пробел пауза · ↑↓ канал · ←→ 10 с · L эфир · F полный экран · M звук · S настройки · C каналы · Esc назад. Общие: Ctrl+K поиск · F12 инструменты разработчика.', '快捷键 — 播放器：空格 播放/暂停 · ↑↓ 换台 · ←→ 10 秒 · L 回到直播 · F 全屏 · M 静音 · S 设置 · C 频道列表 · Esc 返回。通用：Ctrl+K 搜索 · F12 开发者工具。', 'शॉर्टकट — प्लेयर: स्पेस चलाएँ/रोकें · ↑↓ चैनल · ←→ 10 से · L लाइव · F फ़ुल स्क्रीन · M आवाज़ · S सेटिंग्स · C चैनल सूची · Esc वापस। सामान्य: Ctrl+K खोज · F12 डेवलपर टूल।'],
+  'Kısayollar — Oynatıcı: Boşluk oynat/duraklat · ↑↓ kanal · ←→ 10 sn · L canlıya dön · F tam ekran · M ses · S ayarlar · C kanal listesi · Esc geri. Genel: ⌘K arama · ⌘⌥I geliştirici araçları.': ['Shortcuts — Player: Space play/pause · ↑↓ channel · ←→ 10 s · L go live · F full screen · M mute · S settings · C channel list · Esc back. General: ⌘K search · ⌘⌥I developer tools.', 'Tastenkürzel — Player: Leertaste Wiedergabe/Pause · ↑↓ Sender · ←→ 10 s · L live · F Vollbild · M Ton · S Einstellungen · C Senderliste · Esc zurück. Allgemein: ⌘K Suche · ⌘⌥I Entwicklertools.', 'Raccourcis — Lecteur : Espace lecture/pause · ↑↓ chaîne · ←→ 10 s · L direct · F plein écran · M son · S paramètres · C chaînes · Échap retour. Général : ⌘K recherche · ⌘⌥I outils de développement.', 'Atajos — Reproductor: Espacio reproducir/pausa · ↑↓ canal · ←→ 10 s · L directo · F pantalla completa · M sonido · S ajustes · C canales · Esc atrás. General: ⌘K buscar · ⌘⌥I herramientas de desarrollo.', 'Scorciatoie — Player: Spazio play/pausa · ↑↓ canale · ←→ 10 s · L diretta · F schermo intero · M audio · S impostazioni · C canali · Esc indietro. Generale: ⌘K cerca · ⌘⌥I strumenti sviluppatore.', 'Горячие клавиши — Плеер: Пробел пауза · ↑↓ канал · ←→ 10 с · L эфир · F полный экран · M звук · S настройки · C каналы · Esc назад. Общие: ⌘K поиск · ⌘⌥I инструменты разработчика.', '快捷键 — 播放器：空格 播放/暂停 · ↑↓ 换台 · ←→ 10 秒 · L 回到直播 · F 全屏 · M 静音 · S 设置 · C 频道列表 · Esc 返回。通用：⌘K 搜索 · ⌘⌥I 开发者工具。', 'शॉर्टकट — प्लेयर: स्पेस चलाएँ/रोकें · ↑↓ चैनल · ←→ 10 से · L लाइव · F फ़ुल स्क्रीन · M आवाज़ · S सेटिंग्स · C चैनल सूची · Esc वापस। सामान्य: ⌘K खोज · ⌘⌥I डेवलपर टूल।'],
+  // --- PIN / yetişkin
+  'Yetişkin içerik': ['Adult content', 'Inhalte für Erwachsene', 'Contenu adulte', 'Contenido para adultos', 'Contenuti per adulti', 'Контент для взрослых', '成人内容', 'वयस्क सामग्री'],
+  'Devam etmek için 4 haneli PIN kodunu gir.': ['Enter your 4-digit PIN to continue.', 'Gib zum Fortfahren deine 4-stellige PIN ein.', 'Saisissez votre code PIN à 4 chiffres.', 'Introduce tu PIN de 4 dígitos para continuar.', 'Inserisci il PIN di 4 cifre per continuare.', 'Введите 4-значный PIN-код.', '输入 4 位 PIN 码以继续。', 'जारी रखने के लिए 4 अंकों का PIN दर्ज करें।'],
+  'PIN hatalı.': ['Wrong PIN.', 'Falsche PIN.', 'PIN incorrect.', 'PIN incorrecto.', 'PIN errato.', 'Неверный PIN.', 'PIN 错误。', 'गलत PIN।'],
+  'PIN değiştir': ['Change PIN', 'PIN ändern', 'Modifier le PIN', 'Cambiar PIN', 'Cambia PIN', 'Сменить PIN', '更改 PIN', 'PIN बदलें'],
+  'Önce mevcut PIN\'i gir.': ['Enter your current PIN first.', 'Zuerst die aktuelle PIN eingeben.', 'Saisissez d’abord le PIN actuel.', 'Introduce primero el PIN actual.', 'Inserisci prima il PIN attuale.', 'Сначала введите текущий PIN.', '请先输入当前 PIN。', 'पहले मौजूदा PIN दर्ज करें।'],
+  'PIN gerekli': ['PIN required', 'PIN erforderlich', 'PIN requis', 'Se requiere PIN', 'PIN richiesto', 'Нужен PIN', '需要 PIN', 'PIN आवश्यक'],
+  'Bu ayarı değiştirmek için PIN\'i gir.': ['Enter the PIN to change this setting.', 'PIN eingeben, um diese Einstellung zu ändern.', 'Saisissez le PIN pour modifier ce réglage.', 'Introduce el PIN para cambiar este ajuste.', 'Inserisci il PIN per modificare questa impostazione.', 'Введите PIN, чтобы изменить настройку.', '输入 PIN 以更改此设置。', 'यह सेटिंग बदलने के लिए PIN दर्ज करें।'],
+  'PIN 4 rakamdan oluşmalı.': ['The PIN must be 4 digits.', 'Die PIN muss 4 Ziffern haben.', 'Le PIN doit comporter 4 chiffres.', 'El PIN debe tener 4 dígitos.', 'Il PIN deve avere 4 cifre.', 'PIN должен состоять из 4 цифр.', 'PIN 必须为 4 位数字。', 'PIN 4 अंकों का होना चाहिए।'],
+  'PIN\'ler eşleşmiyor.': ['The PINs do not match.', 'Die PINs stimmen nicht überein.', 'Les PIN ne correspondent pas.', 'Los PIN no coinciden.', 'I PIN non coincidono.', 'PIN не совпадают.', '两次输入的 PIN 不一致。', 'PIN मेल नहीं खाते।'],
+  'PIN kaydedildi': ['PIN saved', 'PIN gespeichert', 'PIN enregistré', 'PIN guardado', 'PIN salvato', 'PIN сохранён', 'PIN 已保存', 'PIN सहेजा गया'],
+  // --- hesabım
+  'Hesap Bilgileri': ['Account Details', 'Kontodaten', 'Informations du compte', 'Datos de la cuenta', 'Dati account', 'Данные аккаунта', '账户信息', 'खाता विवरण'],
+  'Durum, bitiş tarihi, bağlantı limiti ve sunucu bilgileri.': ['Status, expiry date, connection limit and server details.', 'Status, Ablaufdatum, Verbindungslimit und Serverdaten.', 'Statut, date d’expiration, limite de connexions et serveur.', 'Estado, caducidad, límite de conexiones y servidor.', 'Stato, scadenza, limite connessioni e server.', 'Статус, срок действия, лимит подключений и сервер.', '状态、到期日、连接上限和服务器信息。', 'स्थिति, समाप्ति तिथि, कनेक्शन सीमा और सर्वर विवरण।'],
+  'Profil ve Şifre': ['Profile & Password', 'Profil & Passwort', 'Profil et mot de passe', 'Perfil y contraseña', 'Profilo e password', 'Профиль и пароль', '配置与密码', 'प्रोफ़ाइल और पासवर्ड'],
+  'Profilleri düzenle. Şifreler bu bilgisayarda şifreli saklanır.': ['Edit profiles. Passwords are stored encrypted on this computer.', 'Profile bearbeiten. Passwörter werden verschlüsselt gespeichert.', 'Modifiez les profils. Les mots de passe sont chiffrés sur cet ordinateur.', 'Edita perfiles. Las contraseñas se guardan cifradas en este equipo.', 'Modifica i profili. Le password sono cifrate su questo computer.', 'Изменяйте профили. Пароли хранятся в зашифрованном виде.', '编辑配置。密码在本机加密保存。', 'प्रोफ़ाइलें संपादित करें। पासवर्ड इस कंप्यूटर पर एन्क्रिप्ट होकर सहेजे जाते हैं।'],
+  'Kategorileri Yönet': ['Manage Categories', 'Kategorien verwalten', 'Gérer les catégories', 'Gestionar categorías', 'Gestisci categorie', 'Управление категориями', '管理分类', 'श्रेणियाँ प्रबंधित करें'],
+  'Canlı, film ve dizi kategorilerini kullanımına göre aç kapat.': ['Turn live, movie and series categories on or off.', 'Live-, Film- und Serienkategorien ein- oder ausblenden.', 'Activez ou masquez les catégories direct, films et séries.', 'Activa u oculta categorías de directo, películas y series.', 'Attiva o nascondi le categorie di diretta, film e serie.', 'Включайте и скрывайте категории эфира, фильмов и сериалов.', '按需开启或隐藏直播、电影和剧集分类。', 'लाइव, फ़िल्म और सीरीज़ श्रेणियाँ चालू या बंद करें।'],
+  'Yetişkin İçerik': ['Adult Content', 'Erwachseneninhalte', 'Contenu adulte', 'Contenido adulto', 'Contenuti per adulti', 'Контент 18+', '成人内容', 'वयस्क सामग्री'],
+  'Yetişkin kategorilerini gizle ya da 4 haneli PIN ile koru.': ['Hide adult categories or protect them with a 4-digit PIN.', 'Erwachsenenkategorien ausblenden oder per 4-stelliger PIN schützen.', 'Masquez les catégories adultes ou protégez-les par PIN.', 'Oculta las categorías adultas o protégelas con un PIN.', 'Nascondi le categorie per adulti o proteggile con un PIN.', 'Скрывайте категории 18+ или защитите их PIN-кодом.', '隐藏成人分类，或用 4 位 PIN 保护。', 'वयस्क श्रेणियाँ छिपाएँ या 4 अंकों के PIN से सुरक्षित करें।'],
+  'Cihaz Analizi': ['Device Check', 'Geräteanalyse', 'Diagnostic', 'Diagnóstico', 'Diagnostica', 'Диагностика', '设备检测', 'डिवाइस जाँच'],
+  'Sunucu erişimi, bağlantı hızı ve desteklenen yayın formatları.': ['Server access, connection speed and supported stream formats.', 'Serverzugriff, Verbindungsgeschwindigkeit und unterstützte Formate.', 'Accès serveur, débit et formats pris en charge.', 'Acceso al servidor, velocidad y formatos compatibles.', 'Accesso al server, velocità e formati supportati.', 'Доступ к серверу, скорость и поддерживаемые форматы.', '服务器访问、网速和支持的格式。', 'सर्वर पहुँच, कनेक्शन गति और समर्थित फ़ॉर्मेट।'],
+  'Sağlayıcı Paneli': ['Provider Panel', 'Anbieterportal', 'Espace fournisseur', 'Panel del proveedor', 'Pannello provider', 'Панель провайдера', '服务商面板', 'प्रदाता पैनल'],
+  'Kredi yükleme, işlem geçmişi gibi işlemler için sağlayıcının sitesi.': ['Your provider’s site for top-ups, transaction history and more.', 'Website deines Anbieters für Aufladen, Verlauf usw.', 'Le site de votre fournisseur pour recharges et historique.', 'Web del proveedor para recargas, historial, etc.', 'Il sito del provider per ricariche e storico.', 'Сайт провайдера для пополнения, истории и т. п.', '服务商网站：充值、交易记录等。', 'टॉप-अप, लेन-देन इतिहास आदि के लिए प्रदाता की साइट।'],
+  'Durum': ['Status', 'Status', 'Statut', 'Estado', 'Stato', 'Статус', '状态', 'स्थिति'],
+  'Aktif': ['Active', 'Aktiv', 'Actif', 'Activa', 'Attivo', 'Активен', '有效', 'सक्रिय'],
+  'Bitiş tarihi': ['Expiry date', 'Ablaufdatum', 'Date d’expiration', 'Fecha de caducidad', 'Scadenza', 'Действует до', '到期日', 'समाप्ति तिथि'],
+  'Sınırsız': ['Unlimited', 'Unbegrenzt', 'Illimité', 'Ilimitado', 'Illimitato', 'Без ограничений', '无限期', 'असीमित'],
+  'Süre doldu': ['Expired', 'Abgelaufen', 'Expiré', 'Caducado', 'Scaduto', 'Истёк', '已过期', 'समाप्त'],
+  'Oluşturulma': ['Created', 'Erstellt', 'Créé le', 'Creada', 'Creato', 'Создан', '创建日期', 'बनाया गया'],
+  'Paket türü': ['Plan type', 'Pakettyp', 'Type d’abonnement', 'Tipo de plan', 'Tipo di piano', 'Тип пакета', '套餐类型', 'प्लान प्रकार'],
+  'Deneme': ['Trial', 'Test', 'Essai', 'Prueba', 'Prova', 'Пробный', '试用', 'ट्रायल'],
+  'Standart': ['Standard', 'Standard', 'Standard', 'Estándar', 'Standard', 'Стандарт', '标准', 'मानक'],
+  'Eş zamanlı bağlantı': ['Simultaneous connections', 'Gleichzeitige Verbindungen', 'Connexions simultanées', 'Conexiones simultáneas', 'Connessioni simultanee', 'Одновременные подключения', '同时连接数', 'एक साथ कनेक्शन'],
+  'Aynı anda açılabilecek yayın sayısı. Soldaki sayı, bilgilerin alındığı anda açık olan yayın sayısıdır.': ['How many streams can be open at once. The left number is how many were open when the details were fetched.', 'Wie viele Streams gleichzeitig laufen dürfen. Links: beim Abruf gerade offene Streams.', 'Nombre de flux simultanés autorisés. À gauche : flux ouverts au moment de la récupération.', 'Cuántas emisiones pueden abrirse a la vez. El número izquierdo son las abiertas al consultar.', 'Quanti stream possono essere aperti insieme. A sinistra: quelli aperti al momento della lettura.', 'Сколько потоков можно открыть одновременно. Слева — открытые на момент запроса.', '可同时打开的直播数。左侧为获取信息时正在使用的数量。', 'एक साथ कितनी स्ट्रीम खुल सकती हैं। बाईं संख्या जानकारी लेते समय खुली स्ट्रीम है।'],
+  'Yayın formatları': ['Stream formats', 'Stream-Formate', 'Formats de flux', 'Formatos', 'Formati di streaming', 'Форматы потока', '流格式', 'स्ट्रीम फ़ॉर्मेट'],
+  'Sunucu': ['Server', 'Server', 'Serveur', 'Servidor', 'Server', 'Сервер', '服务器', 'सर्वर'],
+  'Sunucu saati': ['Server time', 'Serverzeit', 'Heure du serveur', 'Hora del servidor', 'Ora del server', 'Время сервера', '服务器时间', 'सर्वर समय'],
+  'Bilgileri yenile': ['Refresh details', 'Daten aktualisieren', 'Actualiser', 'Actualizar datos', 'Aggiorna dati', 'Обновить данные', '刷新信息', 'विवरण रीफ़्रेश करें'],
+  'Hesap bilgileri güncellendi': ['Account details updated', 'Kontodaten aktualisiert', 'Informations mises à jour', 'Datos actualizados', 'Dati aggiornati', 'Данные обновлены', '账户信息已更新', 'खाता विवरण अपडेट हुआ'],
+  'Hesap süren doldu': ['Your account has expired', 'Dein Konto ist abgelaufen', 'Votre compte a expiré', 'Tu cuenta ha caducado', 'Il tuo account è scaduto', 'Срок действия аккаунта истёк', '账户已过期', 'आपका खाता समाप्त हो गया'],
+  'Hesabın yarın bitiyor': ['Your account expires tomorrow', 'Dein Konto läuft morgen ab', 'Votre compte expire demain', 'Tu cuenta caduca mañana', 'Il tuo account scade domani', 'Аккаунт истекает завтра', '账户明天到期', 'आपका खाता कल समाप्त होगा'],
+  'Şifre saklama': ['Password storage', 'Passwortspeicherung', 'Stockage du mot de passe', 'Almacenamiento de contraseña', 'Archiviazione password', 'Хранение пароля', '密码存储', 'पासवर्ड संग्रहण'],
+  'Şifrelenmemiş': ['Not encrypted', 'Nicht verschlüsselt', 'Non chiffré', 'Sin cifrar', 'Non cifrata', 'Не зашифрован', '未加密', 'एन्क्रिप्टेड नहीं'],
+  'Şifre yalnızca bu Windows kullanıcısı tarafından çözülebilir.': ['Only this Windows user can decrypt the password.', 'Nur dieser Windows-Benutzer kann das Passwort entschlüsseln.', 'Seul cet utilisateur Windows peut déchiffrer le mot de passe.', 'Solo este usuario de Windows puede descifrar la contraseña.', 'Solo questo utente Windows può decifrare la password.', 'Расшифровать пароль может только этот пользователь Windows.', '只有当前 Windows 用户能解密密码。', 'केवल यही Windows उपयोगकर्ता पासवर्ड डिक्रिप्ट कर सकता है।'],
+  'Şifre yalnızca bu Mac kullanıcısı tarafından çözülebilir.': ['Only this Mac user can decrypt the password.', 'Nur dieser Mac-Benutzer kann das Passwort entschlüsseln.', 'Seul cet utilisateur Mac peut déchiffrer le mot de passe.', 'Solo este usuario de Mac puede descifrar la contraseña.', 'Solo questo utente Mac può decifrare la password.', 'Расшифровать пароль может только этот пользователь Mac.', '只有当前 Mac 用户能解密密码。', 'केवल यही Mac उपयोगकर्ता पासवर्ड डिक्रिप्ट कर सकता है।'],
+  'Bu sistemde şifreleme kullanılamıyor.': ['Encryption is not available on this system.', 'Verschlüsselung ist auf diesem System nicht verfügbar.', 'Le chiffrement n’est pas disponible sur ce système.', 'El cifrado no está disponible en este sistema.', 'La cifratura non è disponibile su questo sistema.', 'Шифрование недоступно в этой системе.', '此系统不支持加密。', 'इस सिस्टम पर एन्क्रिप्शन उपलब्ध नहीं।'],
+  'Windows DPAPI': ['Windows DPAPI', 'Windows DPAPI', 'Windows DPAPI', 'Windows DPAPI', 'Windows DPAPI', 'Windows DPAPI', 'Windows DPAPI', 'Windows DPAPI'],
+  'macOS Anahtar Zinciri': ['macOS Keychain', 'macOS-Schlüsselbund', 'Trousseau macOS', 'Llavero de macOS', 'Portachiavi macOS', 'Связка ключей macOS', 'macOS 钥匙串', 'macOS कीचेन'],
+  'Otomatik bağlan': ['Auto-connect', 'Automatisch verbinden', 'Connexion auto', 'Conexión automática', 'Connessione automatica', 'Автоподключение', '自动连接', 'ऑटो-कनेक्ट'],
+  'Açık': ['On', 'An', 'Activé', 'Activado', 'Attivo', 'Вкл.', '开', 'चालू'],
+  'Kapalı': ['Off', 'Aus', 'Désactivé', 'Desactivado', 'Disattivo', 'Выкл.', '关', 'बंद'],
+  'Hepsini aç': ['Turn all on', 'Alle einblenden', 'Tout activer', 'Activar todas', 'Attiva tutte', 'Включить все', '全部开启', 'सभी चालू करें'],
+  'Hepsini kapat': ['Turn all off', 'Alle ausblenden', 'Tout masquer', 'Ocultar todas', 'Nascondi tutte', 'Скрыть все', '全部隐藏', 'सभी बंद करें'],
+  'Görünürlük': ['Visibility', 'Sichtbarkeit', 'Visibilité', 'Visibilidad', 'Visibilità', 'Видимость', '可见性', 'दृश्यता'],
+  'Göster': ['Show', 'Anzeigen', 'Afficher', 'Mostrar', 'Mostra', 'Показывать', '显示', 'दिखाएँ'],
+  'Gizle': ['Hide', 'Ausblenden', 'Masquer', 'Ocultar', 'Nascondi', 'Скрыть', '隐藏', 'छिपाएँ'],
+  'PIN ile koru': ['Protect with PIN', 'Mit PIN schützen', 'Protéger par PIN', 'Proteger con PIN', 'Proteggi con PIN', 'Защитить PIN-кодом', '用 PIN 保护', 'PIN से सुरक्षित करें'],
+  'Yetişkin kategorileri diğerleri gibi görünür.': ['Adult categories are shown like the others.', 'Erwachsenenkategorien werden normal angezeigt.', 'Les catégories adultes s’affichent normalement.', 'Las categorías adultas se muestran como las demás.', 'Le categorie per adulti sono mostrate come le altre.', 'Категории 18+ показываются как обычные.', '成人分类与其他分类一样显示。', 'वयस्क श्रेणियाँ दूसरों की तरह दिखती हैं।'],
+  'Yetişkin kategorileri hiçbir yerde görünmez.': ['Adult categories are hidden everywhere.', 'Erwachsenenkategorien sind überall ausgeblendet.', 'Les catégories adultes sont masquées partout.', 'Las categorías adultas se ocultan en todas partes.', 'Le categorie per adulti sono nascoste ovunque.', 'Категории 18+ скрыты везде.', '成人分类在所有位置隐藏。', 'वयस्क श्रेणियाँ हर जगह छिपी रहती हैं।'],
+  'Kategoriler kilitli görünür; açmak için PIN gerekir. Uygulama kapanınca tekrar kilitlenir.': ['Categories appear locked and need the PIN to open. They lock again when the app closes.', 'Kategorien erscheinen gesperrt und brauchen die PIN. Beim Schließen wieder gesperrt.', 'Les catégories sont verrouillées et demandent le PIN. Elles se reverrouillent à la fermeture.', 'Las categorías aparecen bloqueadas y piden el PIN. Se bloquean al cerrar la app.', 'Le categorie appaiono bloccate e richiedono il PIN. Si bloccano di nuovo alla chiusura.', 'Категории заблокированы, для открытия нужен PIN. После закрытия снова блокируются.', '分类显示为锁定，需要 PIN 才能打开。关闭应用后重新锁定。', 'श्रेणियाँ लॉक दिखती हैं, खोलने के लिए PIN चाहिए। ऐप बंद होने पर फिर लॉक हो जाती हैं।'],
+  'PIN belirle': ['Set PIN', 'PIN festlegen', 'Définir le PIN', 'Establecer PIN', 'Imposta PIN', 'Задать PIN', '设置 PIN', 'PIN सेट करें'],
+  '4 haneli bir PIN gir.': ['Enter a 4-digit PIN.', 'Gib eine 4-stellige PIN ein.', 'Saisissez un PIN à 4 chiffres.', 'Introduce un PIN de 4 dígitos.', 'Inserisci un PIN di 4 cifre.', 'Введите 4-значный PIN.', '输入 4 位 PIN。', '4 अंकों का PIN दर्ज करें।'],
+  'Yeni PIN': ['New PIN', 'Neue PIN', 'Nouveau PIN', 'PIN nuevo', 'Nuovo PIN', 'Новый PIN', '新 PIN', 'नया PIN'],
+  'Tekrar': ['Repeat', 'Wiederholen', 'Confirmer', 'Repetir', 'Ripeti', 'Повторите', '再次输入', 'दोबारा'],
+  'PIN\'i kaydet': ['Save PIN', 'PIN speichern', 'Enregistrer le PIN', 'Guardar PIN', 'Salva PIN', 'Сохранить PIN', '保存 PIN', 'PIN सहेजें'],
+  'PIN tanımlı.': ['A PIN is set.', 'Eine PIN ist festgelegt.', 'Un PIN est défini.', 'Hay un PIN establecido.', 'Il PIN è impostato.', 'PIN задан.', '已设置 PIN。', 'PIN सेट है।'],
+  'PIN\'i değiştir': ['Change PIN', 'PIN ändern', 'Modifier le PIN', 'Cambiar PIN', 'Cambia PIN', 'Сменить PIN', '更改 PIN', 'PIN बदलें'],
+  'Algılanan kategoriler': ['Detected categories', 'Erkannte Kategorien', 'Catégories détectées', 'Categorías detectadas', 'Categorie rilevate', 'Найденные категории', '检测到的分类', 'पहचानी गई श्रेणियाँ'],
+  'Algılama kategori adına göre yapılır (Adult, XXX, +18, Yetişkin…). Eksik kalan olursa Kategorileri Yönet\'ten kapatabilirsin.': ['Detection uses the category name (Adult, XXX, +18…). If something is missed, turn it off in Manage Categories.', 'Erkennung anhand des Kategorienamens (Adult, XXX, +18…). Fehlendes unter „Kategorien verwalten“ ausblenden.', 'La détection se base sur le nom (Adult, XXX, +18…). Sinon, masquez-la dans Gérer les catégories.', 'Se detecta por el nombre (Adult, XXX, +18…). Si falta alguna, ocúltala en Gestionar categorías.', 'Il rilevamento usa il nome (Adult, XXX, +18…). Se ne manca qualcuna, nascondila da Gestisci categorie.', 'Определяется по названию (Adult, XXX, +18…). Пропущенные скройте в «Управлении категориями».', '根据分类名称检测（Adult、XXX、+18…）。遗漏的可在“管理分类”中隐藏。', 'पहचान श्रेणी नाम से होती है (Adult, XXX, +18…)। कुछ छूटे तो श्रेणियाँ प्रबंधित करें में बंद करें।'],
+  'Yüklenen listelerde yetişkin kategorisi bulunamadı.': ['No adult categories found in the loaded lists.', 'In den geladenen Listen wurden keine Erwachsenenkategorien gefunden.', 'Aucune catégorie adulte trouvée.', 'No se encontraron categorías adultas.', 'Nessuna categoria per adulti trovata.', 'Категории 18+ не найдены.', '已加载列表中未发现成人分类。', 'लोड की गई सूचियों में कोई वयस्क श्रेणी नहीं मिली।'],
+  // --- cihaz analizi
+  'Hız testi bir canlı kanaldan birkaç saniye veri indirir. Bağlantı limitin 1 ise test sırasında açık yayın durdurulur.': ['The speed test downloads a few seconds from a live channel. If your connection limit is 1, the current stream stops during the test.', 'Der Test lädt einige Sekunden eines Live-Senders. Bei Limit 1 wird der laufende Stream gestoppt.', 'Le test télécharge quelques secondes d’une chaîne. Si la limite est 1, le flux en cours s’arrête.', 'La prueba descarga unos segundos de un canal. Si tu límite es 1, se detiene la emisión actual.', 'Il test scarica alcuni secondi da un canale. Con limite 1 lo stream attuale si ferma.', 'Тест скачивает несколько секунд эфира. При лимите 1 текущий поток остановится.', '测速会从直播频道下载几秒数据。若连接上限为 1，当前播放会停止。', 'स्पीड टेस्ट लाइव चैनल से कुछ सेकंड डाउनलोड करता है। सीमा 1 हो तो चालू स्ट्रीम रुक जाएगी।'],
+  'Analizi başlat': ['Start check', 'Analyse starten', 'Lancer le diagnostic', 'Iniciar diagnóstico', 'Avvia diagnostica', 'Запустить', '开始检测', 'जाँच शुरू करें'],
+  'Sunucu yanıt süresi': ['Server response time', 'Server-Antwortzeit', 'Temps de réponse', 'Tiempo de respuesta', 'Tempo di risposta', 'Время ответа сервера', '服务器响应时间', 'सर्वर प्रतिक्रिया समय'],
+  'ölçülüyor…': ['measuring…', 'wird gemessen…', 'mesure…', 'midiendo…', 'misurazione…', 'измерение…', '测量中…', 'माप रहे हैं…'],
+  'İndirme hızı': ['Download speed', 'Download-Geschwindigkeit', 'Débit descendant', 'Velocidad de descarga', 'Velocità di download', 'Скорость загрузки', '下载速度', 'डाउनलोड गति'],
+  'İndirme hızı (canlı kanal)': ['Download speed (live channel)', 'Download (Live-Sender)', 'Débit (chaîne en direct)', 'Velocidad (canal en directo)', 'Velocità (canale live)', 'Скорость (эфир)', '下载速度（直播频道）', 'डाउनलोड गति (लाइव चैनल)'],
+  'Canlı yayın gerçek zamanlı aktığı için bu değer, kanalın kendi yayın hızıyla sınırlı olabilir. Yayın takılmadan akıyorsa bağlantın yeterlidir.': ['Live streams flow in real time, so this may be capped by the channel’s own bitrate. If playback is smooth, your connection is fine.', 'Live-Streams laufen in Echtzeit, der Wert kann durch die Senderbitrate begrenzt sein. Läuft es flüssig, reicht die Verbindung.', 'Le direct est en temps réel : la valeur peut être limitée par le débit de la chaîne. Si c’est fluide, c’est suffisant.', 'El directo fluye en tiempo real; el valor puede limitarse a la tasa del canal. Si va fluido, tu conexión basta.', 'La diretta scorre in tempo reale: il valore può essere limitato dal bitrate del canale. Se è fluida, va bene.', 'Эфир идёт в реальном времени, значение может ограничиваться битрейтом канала. Если без рывков — всё хорошо.', '直播为实时传输，数值可能受频道码率限制。播放流畅即表示网络足够。', 'लाइव स्ट्रीम रियल-टाइम चलती है, यह मान चैनल के बिटरेट तक सीमित हो सकता है। बिना रुकावट चले तो कनेक्शन ठीक है।'],
+  'Test için kanal yok': ['No channel to test with', 'Kein Sender zum Testen', 'Aucune chaîne pour le test', 'No hay canal para la prueba', 'Nessun canale per il test', 'Нет канала для теста', '没有可用于测试的频道', 'जाँच के लिए कोई चैनल नहीं'],
+  'iptal': ['cancelled', 'abgebrochen', 'annulé', 'cancelado', 'annullato', 'отменено', '已取消', 'रद्द'],
+  'Bu bilgisayarın desteklediği formatlar': ['Formats supported by this computer', 'Von diesem Computer unterstützte Formate', 'Formats pris en charge par cet ordinateur', 'Formatos compatibles con este equipo', 'Formati supportati da questo computer', 'Форматы, поддерживаемые компьютером', '本机支持的格式', 'इस कंप्यूटर द्वारा समर्थित फ़ॉर्मेट'],
+  'H.264 / AVC (çoğu kanal)': ['H.264 / AVC (most channels)', 'H.264 / AVC (die meisten Sender)', 'H.264 / AVC (la plupart des chaînes)', 'H.264 / AVC (mayoría de canales)', 'H.264 / AVC (quasi tutti i canali)', 'H.264 / AVC (большинство каналов)', 'H.264 / AVC（多数频道）', 'H.264 / AVC (अधिकांश चैनल)'],
+  'H.265 / HEVC (bazı 4K kanallar)': ['H.265 / HEVC (some 4K channels)', 'H.265 / HEVC (manche 4K-Sender)', 'H.265 / HEVC (certaines chaînes 4K)', 'H.265 / HEVC (algunos canales 4K)', 'H.265 / HEVC (alcuni canali 4K)', 'H.265 / HEVC (некоторые 4K)', 'H.265 / HEVC（部分 4K 频道）', 'H.265 / HEVC (कुछ 4K चैनल)'],
+  'AAC ses': ['AAC audio', 'AAC-Audio', 'Audio AAC', 'Audio AAC', 'Audio AAC', 'Звук AAC', 'AAC 音频', 'AAC ऑडियो'],
+  'MP3 ses': ['MP3 audio', 'MP3-Audio', 'Audio MP3', 'Audio MP3', 'Audio MP3', 'Звук MP3', 'MP3 音频', 'MP3 ऑडियो'],
+  'Dolby AC-3 ses': ['Dolby AC-3 audio', 'Dolby-AC-3-Audio', 'Audio Dolby AC-3', 'Audio Dolby AC-3', 'Audio Dolby AC-3', 'Звук Dolby AC-3', 'Dolby AC-3 音频', 'Dolby AC-3 ऑडियो'],
+  'Dolby E-AC-3 ses': ['Dolby E-AC-3 audio', 'Dolby-E-AC-3-Audio', 'Audio Dolby E-AC-3', 'Audio Dolby E-AC-3', 'Audio Dolby E-AC-3', 'Звук Dolby E-AC-3', 'Dolby E-AC-3 音频', 'Dolby E-AC-3 ऑडियो'],
+  'Destekleniyor': ['Supported', 'Unterstützt', 'Pris en charge', 'Compatible', 'Supportato', 'Поддерживается', '支持', 'समर्थित'],
+  'Desteklenmiyor': ['Not supported', 'Nicht unterstützt', 'Non pris en charge', 'No compatible', 'Non supportato', 'Не поддерживается', '不支持', 'समर्थित नहीं'],
+  'Uygulama': ['App', 'App', 'Application', 'Aplicación', 'App', 'Приложение', '应用', 'ऐप'],
+  'Sağlayıcı paneli adresi': ['Provider panel address', 'Adresse des Anbieterportals', 'Adresse de l’espace fournisseur', 'Dirección del panel', 'Indirizzo del pannello', 'Адрес панели провайдера', '服务商面板地址', 'प्रदाता पैनल पता'],
+  'Kredi yükleme, işlem geçmişi, güvenlik kayıtları ve referanslar sağlayıcının kendi web panelinde yönetilir; Xtream bağlantısı bu bilgileri uygulamalara vermez. Panelin adresini kaydedersen buradan tek tıkla açabilirsin.': ['Top-ups, transaction history, security logs and referrals are managed on your provider’s own website; Xtream does not share them with apps. Save the address to open it here with one click.', 'Aufladen, Verlauf, Sicherheitsprotokolle und Empfehlungen verwaltet der Anbieter auf seiner Website; Xtream gibt diese Daten nicht an Apps. Adresse speichern, um sie hier zu öffnen.', 'Recharges, historique, journaux de sécurité et parrainages se gèrent sur le site du fournisseur ; Xtream ne les transmet pas aux applis. Enregistrez l’adresse pour l’ouvrir ici.', 'Recargas, historial, registros de seguridad y referidos se gestionan en la web del proveedor; Xtream no los comparte con apps. Guarda la dirección para abrirla aquí.', 'Ricariche, storico, log di sicurezza e referral si gestiscono sul sito del provider; Xtream non li fornisce alle app. Salva l’indirizzo per aprirlo da qui.', 'Пополнение, история, журналы безопасности и рефералы — на сайте провайдера; Xtream не передаёт их приложениям. Сохраните адрес, чтобы открывать его отсюда.', '充值、交易记录、安全日志和推荐由服务商网站管理；Xtream 不向应用提供这些信息。保存地址即可一键打开。', 'टॉप-अप, लेन-देन इतिहास, सुरक्षा लॉग और रेफ़रल प्रदाता की वेबसाइट पर प्रबंधित होते हैं; Xtream इन्हें ऐप्स को नहीं देता। पता सहेजें ताकि यहाँ से खोल सकें।'],
+  'Adres': ['Address', 'Adresse', 'Adresse', 'Dirección', 'Indirizzo', 'Адрес', '地址', 'पता'],
+  'Paneli aç': ['Open panel', 'Portal öffnen', 'Ouvrir l’espace', 'Abrir panel', 'Apri pannello', 'Открыть панель', '打开面板', 'पैनल खोलें'],
+  // --- oynatıcı
+  'Yayın açılamadı. Kanal şu an kapalı olabilir ya da yayın biçimi desteklenmiyor. Ayarlar › Gelişmiş Ayarlar\'dan formatı değiştirmeyi dene.': ['Could not open the stream. The channel may be offline or the format unsupported. Try another format in Settings › Advanced Settings.', 'Stream konnte nicht geöffnet werden. Sender offline oder Format nicht unterstützt. Anderes Format unter Einstellungen › Erweitert probieren.', 'Impossible d’ouvrir le flux. Chaîne hors ligne ou format non pris en charge. Essayez un autre format dans Paramètres › Avancés.', 'No se pudo abrir la emisión. El canal puede estar caído o el formato no ser compatible. Prueba otro en Ajustes › Avanzados.', 'Impossibile aprire lo stream. Canale offline o formato non supportato. Prova un altro formato in Impostazioni › Avanzate.', 'Не удалось открыть поток. Канал может быть недоступен или формат не поддерживается. Смените формат в Настройки › Дополнительно.', '无法打开直播。频道可能已下线或格式不受支持。请在 设置 › 高级设置 中尝试其他格式。', 'स्ट्रीम नहीं खुली। चैनल बंद हो सकता है या फ़ॉर्मेट समर्थित नहीं। सेटिंग्स › उन्नत सेटिंग्स में दूसरा फ़ॉर्मेट आज़माएँ।'],
+  'Yayın açılıyor…': ['Opening stream…', 'Stream wird geöffnet…', 'Ouverture du flux…', 'Abriendo emisión…', 'Apertura stream…', 'Открытие потока…', '正在打开…', 'स्ट्रीम खुल रही है…'],
+  'Arabelleğe alınıyor…': ['Buffering…', 'Puffern…', 'Mise en mémoire tampon…', 'Almacenando en búfer…', 'Buffering…', 'Буферизация…', '缓冲中…', 'बफ़र हो रहा है…'],
+  'Yayın takıldı, yeniden bağlanılıyor…': ['Stream stalled, reconnecting…', 'Stream hängt, neu verbinden…', 'Flux bloqué, reconnexion…', 'Emisión detenida, reconectando…', 'Stream bloccato, riconnessione…', 'Поток завис, переподключение…', '直播卡住，正在重连…', 'स्ट्रीम अटकी, फिर से कनेक्ट हो रहा है…'],
+  'Hızlı kanal geçişi': ['Quick channel switch', 'Schneller Senderwechsel', 'Changement rapide de chaîne', 'Cambio rápido de canal', 'Cambio rapido canale', 'Быстрое переключение', '快速换台', 'तेज़ चैनल बदलें'],
+  '↑ ↓ kanal değiştir · C kapat': ['↑ ↓ change channel · C close', '↑ ↓ Sender wechseln · C schließen', '↑ ↓ changer de chaîne · C fermer', '↑ ↓ cambiar canal · C cerrar', '↑ ↓ cambia canale · C chiudi', '↑ ↓ сменить канал · C закрыть', '↑ ↓ 换台 · C 关闭', '↑ ↓ चैनल बदलें · C बंद करें'],
+  'Oynat / duraklat': ['Play / pause', 'Wiedergabe / Pause', 'Lecture / pause', 'Reproducir / pausa', 'Riproduci / pausa', 'Воспроизведение / пауза', '播放 / 暂停', 'चलाएँ / रोकें'],
+  'Sesi kapat': ['Mute', 'Stummschalten', 'Couper le son', 'Silenciar', 'Disattiva audio', 'Выключить звук', '静音', 'आवाज़ बंद करें'],
+  'Sesi aç': ['Unmute', 'Ton an', 'Rétablir le son', 'Activar sonido', 'Attiva audio', 'Включить звук', '取消静音', 'आवाज़ चालू करें'],
+  'Sesi kapat (M)': ['Mute (M)', 'Stummschalten (M)', 'Couper le son (M)', 'Silenciar (M)', 'Disattiva audio (M)', 'Выключить звук (M)', '静音 (M)', 'आवाज़ बंद करें (M)'],
+  'Sesi aç (M)': ['Unmute (M)', 'Ton an (M)', 'Rétablir le son (M)', 'Activar sonido (M)', 'Attiva audio (M)', 'Включить звук (M)', '取消静音 (M)', 'आवाज़ चालू करें (M)'],
+  'Ses seviyesi': ['Volume', 'Lautstärke', 'Volume', 'Volumen', 'Volume', 'Громкость', '音量', 'आवाज़ स्तर'],
+  'Tam ekran': ['Full screen', 'Vollbild', 'Plein écran', 'Pantalla completa', 'Schermo intero', 'Полный экран', '全屏', 'फ़ुल स्क्रीन'],
+  'Oynatıcı ayarları': ['Player settings', 'Player-Einstellungen', 'Paramètres du lecteur', 'Ajustes del reproductor', 'Impostazioni player', 'Настройки плеера', '播放器设置', 'प्लेयर सेटिंग्स'],
+  'Canlıya dön (L)': ['Go live (L)', 'Zu live (L)', 'Revenir au direct (L)', 'Ir al directo (L)', 'Vai alla diretta (L)', 'К эфиру (L)', '回到直播 (L)', 'लाइव पर जाएँ (L)'],
+  'Ses Dili': ['Audio Language', 'Audiosprache', 'Langue audio', 'Idioma de audio', 'Lingua audio', 'Язык звука', '音频语言', 'ऑडियो भाषा'],
+  'Altyazı': ['Subtitles', 'Untertitel', 'Sous-titres', 'Subtítulos', 'Sottotitoli', 'Субтитры', '字幕', 'सबटाइटल'],
+  'Kalite': ['Quality', 'Qualität', 'Qualité', 'Calidad', 'Qualità', 'Качество', '画质', 'गुणवत्ता'],
+  'Yayın Önbelleği': ['Stream Buffer', 'Stream-Puffer', 'Mémoire tampon', 'Búfer', 'Buffer', 'Буфер потока', '缓冲', 'स्ट्रीम बफ़र'],
+  'Gelişmiş Ayarlar': ['Advanced Settings', 'Erweiterte Einstellungen', 'Paramètres avancés', 'Ajustes avanzados', 'Impostazioni avanzate', 'Дополнительные настройки', '高级设置', 'उन्नत सेटिंग्स'],
+  'İstatistikler': ['Statistics', 'Statistiken', 'Statistiques', 'Estadísticas', 'Statistiche', 'Статистика', '统计信息', 'आँकड़े'],
+  'Bu yayında tek ses kanalı var. TS formatındaki canlı yayınlarda ek ses dilleri gösterilemez; HLS formatını deneyebilirsin.': ['This stream has a single audio track. Extra languages can’t be shown for TS live streams; try the HLS format.', 'Dieser Stream hat nur eine Tonspur. Bei TS-Livestreams keine weiteren Sprachen; HLS probieren.', 'Ce flux n’a qu’une piste audio. Pas d’autres langues en TS ; essayez HLS.', 'Esta emisión tiene una sola pista. En TS no se muestran otros idiomas; prueba HLS.', 'Questo stream ha una sola traccia audio. Con TS non si vedono altre lingue; prova HLS.', 'В потоке одна звуковая дорожка. Для TS другие языки недоступны — попробуйте HLS.', '此直播只有一条音轨。TS 格式无法显示其他语言，可尝试 HLS。', 'इस स्ट्रीम में एक ही ऑडियो ट्रैक है। TS में अन्य भाषाएँ नहीं दिखतीं; HLS आज़माएँ।'],
+  'Bu yayında altyazı bulunamadı.': ['No subtitles in this stream.', 'Keine Untertitel in diesem Stream.', 'Aucun sous-titre pour ce flux.', 'Esta emisión no tiene subtítulos.', 'Nessun sottotitolo in questo stream.', 'Субтитров нет.', '此直播没有字幕。', 'इस स्ट्रीम में सबटाइटल नहीं हैं।'],
+  'Az: daha düşük gecikme, zayıf bağlantıda takılabilir. Fazla: daha geç ama daha akıcı. Değişiklik yayını yeniden açar.': ['Low: less delay but may stutter on weak connections. High: more delay but smoother. Changing it reopens the stream.', 'Gering: weniger Verzögerung, kann ruckeln. Hoch: später, aber flüssiger. Änderung öffnet den Stream neu.', 'Faible : moins de retard, peut saccader. Élevé : plus de retard, plus fluide. Le flux sera rouvert.', 'Bajo: menos retraso, puede cortarse. Alto: más retraso pero más fluido. El cambio reabre la emisión.', 'Basso: meno ritardo, può scattare. Alto: più ritardo ma più fluido. La modifica riapre lo stream.', 'Мало: меньше задержка, возможны рывки. Много: позже, но плавнее. Изменение перезапустит поток.', '少：延迟低，弱网可能卡顿。多：延迟高但更流畅。更改后将重新打开直播。', 'कम: कम देरी, रुक सकती है। ज़्यादा: देर से पर सहज। बदलने पर स्ट्रीम फिर खुलेगी।'],
+  'Otomatik (TS, olmazsa HLS)': ['Automatic (TS, else HLS)', 'Automatisch (TS, sonst HLS)', 'Automatique (TS, sinon HLS)', 'Automático (TS, si no HLS)', 'Automatico (TS, altrimenti HLS)', 'Автоматически (TS, иначе HLS)', '自动（TS，失败则 HLS）', 'स्वचालित (TS, नहीं तो HLS)'],
+  'Görüntü': ['Picture', 'Bild', 'Image', 'Imagen', 'Immagine', 'Изображение', '画面', 'तस्वीर'],
+  'Orijinal oran': ['Original ratio', 'Originalformat', 'Format d’origine', 'Proporción original', 'Proporzioni originali', 'Исходные пропорции', '原始比例', 'मूल अनुपात'],
+  'Ekranı doldur (kırp)': ['Fill screen (crop)', 'Bild füllen (zuschneiden)', 'Remplir (rogner)', 'Llenar (recortar)', 'Riempi (ritaglia)', 'Заполнить (обрезать)', '填充（裁剪）', 'स्क्रीन भरें (क्रॉप)'],
+  'Uzat': ['Stretch', 'Strecken', 'Étirer', 'Estirar', 'Allunga', 'Растянуть', '拉伸', 'खींचें'],
+  'Motor': ['Engine', 'Engine', 'Moteur', 'Motor', 'Motore', 'Движок', '引擎', 'इंजन'],
+  'Çözünürlük': ['Resolution', 'Auflösung', 'Résolution', 'Resolución', 'Risoluzione', 'Разрешение', '分辨率', 'रेज़ोल्यूशन'],
+  'Video codec': ['Video codec', 'Video-Codec', 'Codec vidéo', 'Códec de vídeo', 'Codec video', 'Видеокодек', '视频编码', 'वीडियो कोडेक'],
+  'Ses codec': ['Audio codec', 'Audio-Codec', 'Codec audio', 'Códec de audio', 'Codec audio', 'Аудиокодек', '音频编码', 'ऑडियो कोडेक'],
+  'Tampon': ['Buffer', 'Puffer', 'Tampon', 'Búfer', 'Buffer', 'Буфер', '缓冲', 'बफ़र'],
+  'Düşen kare': ['Dropped frames', 'Verlorene Frames', 'Images perdues', 'Fotogramas perdidos', 'Frame persi', 'Пропущенные кадры', '丢帧', 'छूटे फ़्रेम'],
+  'Önbellek': ['Buffer', 'Puffer', 'Tampon', 'Búfer', 'Buffer', 'Буфер', '缓冲', 'बफ़र'],
+  'Yerel oynatıcı': ['Native player', 'Nativer Player', 'Lecteur natif', 'Reproductor nativo', 'Player nativo', 'Встроенный плеер', '原生播放器', 'नेटिव प्लेयर'],
+  'Favorilere eklendi': ['Added to favourites', 'Zu Favoriten hinzugefügt', 'Ajouté aux favoris', 'Añadido a favoritos', 'Aggiunto ai preferiti', 'Добавлено в избранное', '已加入收藏', 'पसंदीदा में जोड़ा गया'],
+  'Favorilerden çıkarıldı': ['Removed from favourites', 'Aus Favoriten entfernt', 'Retiré des favoris', 'Quitado de favoritos', 'Rimosso dai preferiti', 'Удалено из избранного', '已取消收藏', 'पसंदीदा से हटाया गया'],
+  'Bölüm': ['Episode', 'Folge', 'Épisode', 'Episodio', 'Episodio', 'Серия', '集', 'एपिसोड']
+};
+
+// Değişken içeren metinler: [Türkçe kalıp, [en, de, fr, es, it, ru, zh, hi]]
+// {1},{2} yakalanan grup; {t1} grubun çevirisi.
+const RULES = [
+  [/^Hesabın (\d+) gün sonra bitiyor$/, ['Your account expires in {1} days', 'Dein Konto läuft in {1} Tagen ab', 'Votre compte expire dans {1} jours', 'Tu cuenta caduca en {1} días', 'Il tuo account scade tra {1} giorni', 'Аккаунт истекает через {1} дн.', '账户将在 {1} 天后到期', 'आपका खाता {1} दिन में समाप्त होगा']],
+  [/^(.*) · (\d+) kanal$/, ['{t1} · {2} channels', '{t1} · {2} Sender', '{t1} · {2} chaînes', '{t1} · {2} canales', '{t1} · {2} canali', '{t1} · {2} каналов', '{t1} · {2} 个频道', '{t1} · {2} चैनल']],
+  [/^· (\d+) kanal$/, ['· {1} channels', '· {1} Sender', '· {1} chaînes', '· {1} canales', '· {1} canali', '· {1} каналов', '· {1} 个频道', '· {1} चैनल']],
+  [/^· (\d+) film$/, ['· {1} movies', '· {1} Filme', '· {1} films', '· {1} películas', '· {1} film', '· {1} фильмов', '· {1} 部电影', '· {1} फ़िल्में']],
+  [/^· (\d+) dizi$/, ['· {1} series', '· {1} Serien', '· {1} séries', '· {1} series', '· {1} serie', '· {1} сериалов', '· {1} 部剧集', '· {1} सीरीज़']],
+  [/^Kanal (\d*)( · (?:4K|FHD|HD|SD))?$/, ['Channel {1}{2}', 'Sender {1}{2}', 'Chaîne {1}{2}', 'Canal {1}{2}', 'Canale {1}{2}', 'Канал {1}{2}', '频道 {1}{2}', 'चैनल {1}{2}']],
+  [/^([\d:]+) kaldı$/, ['{1} left', 'noch {1}', 'reste {1}', 'quedan {1}', 'mancano {1}', 'осталось {1}', '剩余 {1}', '{1} बाकी']],
+  [/^(\d+) gün kaldı$/, ['{1} days left', 'noch {1} Tage', '{1} jours restants', 'quedan {1} días', 'mancano {1} giorni', 'осталось {1} дн.', '剩余 {1} 天', '{1} दिन बाकी']],
+  [/^(\d+)\. Sezon$/, ['Season {1}', 'Staffel {1}', 'Saison {1}', 'Temporada {1}', 'Stagione {1}', 'Сезон {1}', '第 {1} 季', 'सीज़न {1}']],
+  [/^(\d+)\. Bölüm$/, ['Episode {1}', 'Folge {1}', 'Épisode {1}', 'Episodio {1}', 'Episodio {1}', 'Серия {1}', '第 {1} 集', 'एपिसोड {1}']],
+  [/^▶ Devam et · (\d+)\. Sezon (\d+)\. Bölüm$/, ['▶ Continue · S{1} E{2}', '▶ Fortsetzen · S{1} F{2}', '▶ Reprendre · S{1} É{2}', '▶ Continuar · T{1} E{2}', '▶ Riprendi · S{1} E{2}', '▶ Продолжить · С{1} Е{2}', '▶ 继续 · 第{1}季 第{2}集', '▶ जारी रखें · S{1} E{2}']],
+  [/^▶ İzle · (\d+)\. Sezon (\d+)\. Bölüm$/, ['▶ Watch · S{1} E{2}', '▶ Ansehen · S{1} F{2}', '▶ Regarder · S{1} É{2}', '▶ Ver · T{1} E{2}', '▶ Guarda · S{1} E{2}', '▶ Смотреть · С{1} Е{2}', '▶ 观看 · 第{1}季 第{2}集', '▶ देखें · S{1} E{2}']],
+  [/^▶ Devam et \(([\d:]+)\)$/, ['▶ Continue ({1})', '▶ Fortsetzen ({1})', '▶ Reprendre ({1})', '▶ Continuar ({1})', '▶ Riprendi ({1})', '▶ Продолжить ({1})', '▶ 继续 ({1})', '▶ जारी रखें ({1})']],
+  [/^“(.*)” için sonuç bulunamadı\.$/, ['No results for “{1}”.', 'Keine Ergebnisse für „{1}“.', 'Aucun résultat pour « {1} ».', 'Sin resultados para «{1}».', 'Nessun risultato per “{1}”.', 'По запросу «{1}» ничего не найдено.', '未找到“{1}”的结果。', '“{1}” के लिए कोई परिणाम नहीं।']],
+  [/^Protokol: (.*)$/, ['Protocol: {1}', 'Protokoll: {1}', 'Protocole : {1}', 'Protocolo: {1}', 'Protocollo: {1}', 'Протокол: {1}', '协议：{1}', 'प्रोटोकॉल: {1}']],
+  [/^Şifreli \((.*)\)$/, ['Encrypted ({t1})', 'Verschlüsselt ({t1})', 'Chiffré ({t1})', 'Cifrada ({t1})', 'Cifrata ({t1})', 'Зашифрован ({t1})', '已加密（{t1}）', 'एन्क्रिप्टेड ({t1})']],
+  [/^(\d+) \/ (\d+) kategori gösteriliyor\..*$/, ['{1} / {2} categories shown. Hidden categories don’t appear in lists, search, home or the TV guide.', '{1} / {2} Kategorien sichtbar. Ausgeblendete erscheinen nicht in Listen, Suche, Startseite und TV-Programm.', '{1} / {2} catégories affichées. Les catégories masquées n’apparaissent nulle part.', '{1} / {2} categorías visibles. Las ocultas no aparecen en listas, búsqueda, inicio ni guía.', '{1} / {2} categorie visibili. Quelle nascoste non compaiono da nessuna parte.', 'Показано {1} из {2} категорий. Скрытые не видны в списках, поиске, на главной и в программе.', '显示 {1} / {2} 个分类。隐藏的分类不会出现在列表、搜索、首页和节目单中。', '{1} / {2} श्रेणियाँ दिख रही हैं। छिपी श्रेणियाँ सूचियों, खोज, होम और टीवी गाइड में नहीं दिखेंगी।']],
+  [/^Önceki kanal: (.*)$/, ['Previous channel: {1}', 'Vorheriger Sender: {1}', 'Chaîne précédente : {1}', 'Canal anterior: {1}', 'Canale precedente: {1}', 'Предыдущий канал: {1}', '上一个频道：{1}', 'पिछला चैनल: {1}']],
+  [/^Hesap durumu: (.*)$/, ['Account status: {1}', 'Kontostatus: {1}', 'Statut du compte : {1}', 'Estado de la cuenta: {1}', 'Stato account: {1}', 'Статус аккаунта: {1}', '账户状态：{1}', 'खाता स्थिति: {1}']],
+  [/^Sunucu hata döndürdü \(HTTP (\d+)\)$/, ['The server returned an error (HTTP {1})', 'Serverfehler (HTTP {1})', 'Erreur du serveur (HTTP {1})', 'Error del servidor (HTTP {1})', 'Errore del server (HTTP {1})', 'Ошибка сервера (HTTP {1})', '服务器错误（HTTP {1}）', 'सर्वर त्रुटि (HTTP {1})']],
+  [/^Bağlantı başarılı · bitiş: (.*) · bağlantı: (.*)$/, ['Connected · expires: {t1} · connections: {2}', 'Verbunden · läuft ab: {t1} · Verbindungen: {2}', 'Connecté · expire : {t1} · connexions : {2}', 'Conectado · caduca: {t1} · conexiones: {2}', 'Connesso · scade: {t1} · connessioni: {2}', 'Подключено · до: {t1} · подключения: {2}', '连接成功 · 到期：{t1} · 连接：{2}', 'कनेक्ट हुआ · समाप्ति: {t1} · कनेक्शन: {2}']],
+  [/^Şu an: (.*)$/, ['Now: {1}', 'Aktuell: {1}', 'Actuel : {1}', 'Ahora: {1}', 'Ora: {1}', 'Сейчас: {1}', '当前：{1}', 'अभी: {1}']],
+  [/^Geri sarılabilir: (.*)$/, ['Rewind available: {1}', 'Zurückspulbar: {1}', 'Retour possible : {1}', 'Se puede retroceder: {1}', 'Riavvolgibile: {1}', 'Можно перемотать: {1}', '可回看：{1}', 'रिवाइंड उपलब्ध: {1}']],
+  [/^Slayt (\d+)$/, ['Slide {1}', 'Folie {1}', 'Diapositive {1}', 'Diapositiva {1}', 'Slide {1}', 'Слайд {1}', '第 {1} 张', 'स्लाइड {1}']],
+  [/^Altyazı (\d+)$/, ['Subtitle {1}', 'Untertitel {1}', 'Sous-titre {1}', 'Subtítulo {1}', 'Sottotitolo {1}', 'Субтитры {1}', '字幕 {1}', 'सबटाइटल {1}']],
+  [/^Seviye (\d+)$/, ['Level {1}', 'Stufe {1}', 'Niveau {1}', 'Nivel {1}', 'Livello {1}', 'Уровень {1}', '级别 {1}', 'स्तर {1}']],
+  [/^"(.*)" profili silinsin mi\?$/, ['Delete the profile “{1}”?', 'Profil „{1}“ löschen?', 'Supprimer le profil « {1} » ?', '¿Eliminar el perfil «{1}»?', 'Eliminare il profilo “{1}”?', 'Удалить профиль «{1}»?', '删除配置“{1}”？', 'प्रोफ़ाइल “{1}” हटाएँ?']],
+  [/^Renk (.*)$/, ['Colour {1}', 'Farbe {1}', 'Couleur {1}', 'Color {1}', 'Colore {1}', 'Цвет {1}', '颜色 {1}', 'रंग {1}']]
+];
+// Metnin içinde geçen parçalar (yayın akışı, süreler, bölüm adları)
+const PARTS = [
+  [/ · Sıradaki: /g, [' · Next: ', ' · Danach: ', ' · Ensuite : ', ' · A continuación: ', ' · A seguire: ', ' · Далее: ', ' · 下一个：', ' · आगे: ']],
+  [/(\d+)\. Sezon (\d+)\. Bölüm/g, ['S{1} E{2}', 'S{1} F{2}', 'S{1} É{2}', 'T{1} E{2}', 'S{1} E{2}', 'С{1} Е{2}', '第{1}季 第{2}集', 'S{1} E{2}']],
+  [/(\d+) sa (\d+) dk/g, ['{1} h {2} min', '{1} Std. {2} Min.', '{1} h {2} min', '{1} h {2} min', '{1} h {2} min', '{1} ч {2} мин', '{1} 小时 {2} 分钟', '{1} घं {2} मि']],
+  [/(\d+) dk(?![a-zçğıöşü])/g, ['{1} min', '{1} Min.', '{1} min', '{1} min', '{1} min', '{1} мин', '{1} 分钟', '{1} मि']],
+  [/\b1 sezon(?![a-zçğıöşü])/g, ['1 season', '1 Staffel', '1 saison', '1 temporada', '1 stagione', '1 сезон', '1 季', '1 सीज़न']],
+  [/(\d+) sezon(?![a-zçğıöşü])/g, ['{1} seasons', '{1} Staffeln', '{1} saisons', '{1} temporadas', '{1} stagioni', 'сезонов: {1}', '{1} 季', '{1} सीज़न']],
+  [/ Mbps \(tahmini\)/g, [' Mbps (est.)', ' Mbps (geschätzt)', ' Mbps (estimé)', ' Mbps (estimado)', ' Mbps (stimato)', ' Мбит/с (оценка)', ' Mbps（估计）', ' Mbps (अनुमानित)']]
+];
+
+// ---------------------------------------------------------------- çeviri motoru
+const LANG = (() => {
+  try {
+    const saved = JSON.parse(localStorage.getItem('catana.settings') || '{}').lang;
+    if (saved && LANGS.some((l) => l.code === saved)) return saved;
+  } catch { /* */ }
+  const sys = String(navigator.language || 'tr').slice(0, 2).toLowerCase();
+  return LANGS.some((l) => l.code === sys) ? sys : 'en';
+})();
+const LANG_IDX = LANG_ORDER.indexOf(LANG);
+const DATE_LOC = (LANGS.find((l) => l.code === LANG) || LANGS[0]).loc;
+document.documentElement.lang = LANG;
+
+const fill = (tpl, m) => tpl.replace(/\{t(\d)\}/g, (_, n) => tr(m[+n] || '')).replace(/\{(\d)\}/g, (_, n) => m[+n] || '');
+function tr(text) {
+  if (LANG_IDX < 0 || !text) return text;
+  const s = String(text);
+  const key = s.trim();
+  if (!key) return s;
+  const hit = DICT[key];
+  if (hit) return s.replace(key, hit[LANG_IDX]);
+  for (const [re, out] of RULES) { const m = key.match(re); if (m) return s.replace(key, fill(out[LANG_IDX], m)); }
+  let r = s;
+  for (const [re, out] of PARTS) { re.lastIndex = 0; if (re.test(r)) { re.lastIndex = 0; r = r.replace(re, (...m) => fill(out[LANG_IDX], m)); } }
+  return r;
+}
+const t = tr;
+const ATTRS = ['placeholder', 'title', 'aria-label'];
+function trTree(root) {
+  if (LANG_IDX < 0) return;
+  if (root.nodeType === 3) { const v = tr(root.data); if (v !== root.data) root.data = v; return; }
+  if (root.nodeType !== 1) return;
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+  let n = root;
+  while (n) {
+    if (n.nodeType === 3) { if (n.data.trim()) { const v = tr(n.data); if (v !== n.data) n.data = v; } }
+    else if (n.tagName === 'SCRIPT' || n.tagName === 'STYLE') { /* atla */ }
+    else for (const a of ATTRS) { const v = n.getAttribute && n.getAttribute(a); if (v) { const x = tr(v); if (x !== v) n.setAttribute(a, x); } }
+    n = w.nextNode();
+  }
+}
+function startI18n() {
+  if (LANG_IDX < 0) return;
+  trTree(document.body);
+  new MutationObserver((recs) => {
+    for (const r of recs) {
+      if (r.type === 'childList') r.addedNodes.forEach(trTree);
+      else if (r.type === 'attributes') { const v = r.target.getAttribute(r.attributeName); if (v) { const x = tr(v); if (x !== v) r.target.setAttribute(r.attributeName, x); } }
+    }
+  }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ATTRS });
+}
