@@ -19,11 +19,15 @@
 
 ## Download
 
+Get the latest version from the **[Releases page](https://github.com/hakancatana/catana-iptv/releases/latest)**:
+
 | Platform | File |
 |---|---|
-| **Windows** 10 / 11 (64-bit) | [`Catana-IPTV-Setup-1.3.1.exe`](https://github.com/hakancatana/catana-iptv/releases/latest) |
-| **macOS** Apple Silicon (M1–M4) | [`Catana-IPTV-1.3.1-mac-AppleSilicon.zip`](https://github.com/hakancatana/catana-iptv/releases/latest) |
-| **macOS** Intel | [`Catana-IPTV-1.3.1-mac-Intel.zip`](https://github.com/hakancatana/catana-iptv/releases/latest) |
+| **Windows** 10 / 11 (64-bit) | `Catana-IPTV-Setup-<version>.exe` |
+| **macOS** Apple Silicon (M1–M4) | `Catana-IPTV-<version>-mac-arm64.zip` |
+| **macOS** Intel | `Catana-IPTV-<version>-mac-x64.zip` |
+
+The app checks for new versions on start-up; on Windows it can download and install the update for you.
 
 > The builds are not code-signed yet.
 > **Windows:** if SmartScreen appears, click *More info → Run anyway*.
@@ -47,6 +51,7 @@
 **Player**
 - MPEG-TS and HLS playback with automatic fallback
 - Settings panel: audio language, subtitles, quality, buffer size, aspect ratio, live statistics
+- **Mini player** (picture-in-picture) keeps playing while you use other apps
 - Keeps the screen awake while playing
 
 **Account & privacy**
@@ -100,6 +105,7 @@
 | `S` | Player settings |
 | `F` / double-click | Full screen |
 | `M` | Mute |
+| `P` | Mini player |
 | `Ctrl/⌘ + K` | Search |
 
 ## Build from source
@@ -116,6 +122,14 @@ npm run dist:mac     # macOS builds (best run on a Mac)
 ```
 
 Built with [Electron](https://www.electronjs.org/), [mpegts.js](https://github.com/xqq/mpegts.js) and [hls.js](https://github.com/video-dev/hls.js). No framework, no build step for the UI — plain HTML, CSS and JavaScript in [`src/`](src).
+
+## Releasing
+
+Bump `version` in `package.json`, then push a tag — GitHub Actions builds the Windows and macOS packages and publishes the release:
+
+```bash
+git tag v1.4.0 && git push origin v1.4.0
+```
 
 ## Disclaimer
 

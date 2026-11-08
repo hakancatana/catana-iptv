@@ -8,5 +8,7 @@ contextBridge.exposeInMainWorld('native', {
   keepAwake: (on) => ipcRenderer.send('power:keepAwake', !!on),
   openExternal: (url) => ipcRenderer.send('shell:open', url),
   platform: process.platform,
+  installUpdate: (url) => ipcRenderer.invoke('update:install', url),
+  onUpdateProgress: (cb) => ipcRenderer.on('update:progress', (e, p) => cb(p)),
   versions: { app: ipcRenderer.sendSync('app:version'), electron: process.versions.electron, chrome: process.versions.chrome }
 });

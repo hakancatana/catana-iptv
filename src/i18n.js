@@ -301,6 +301,19 @@ const DICT = {
   'Yerel oynatıcı': ['Native player', 'Nativer Player', 'Lecteur natif', 'Reproductor nativo', 'Player nativo', 'Встроенный плеер', '原生播放器', 'नेटिव प्लेयर'],
   'Favorilere eklendi': ['Added to favourites', 'Zu Favoriten hinzugefügt', 'Ajouté aux favoris', 'Añadido a favoritos', 'Aggiunto ai preferiti', 'Добавлено в избранное', '已加入收藏', 'पसंदीदा में जोड़ा गया'],
   'Favorilerden çıkarıldı': ['Removed from favourites', 'Aus Favoriten entfernt', 'Retiré des favoris', 'Quitado de favoritos', 'Rimosso dai preferiti', 'Удалено из избранного', '已取消收藏', 'पसंदीदा से हटाया गया'],
+  'Güncellemeler': ['Updates', 'Updates', 'Mises à jour', 'Actualizaciones', 'Aggiornamenti', 'Обновления', '更新', 'अपडेट'],
+  'Güncellemeleri denetle': ['Check for updates', 'Nach Updates suchen', 'Rechercher des mises à jour', 'Buscar actualizaciones', 'Cerca aggiornamenti', 'Проверить обновления', '检查更新', 'अपडेट जाँचें'],
+  'Uygulama güncel.': ['You are up to date.', 'Die App ist aktuell.', 'L’application est à jour.', 'La aplicación está actualizada.', 'L’app è aggiornata.', 'Установлена последняя версия.', '已是最新版本。', 'ऐप अपडेटेड है।'],
+  'Güncelleme denetlenemedi.': ['Could not check for updates.', 'Updateprüfung fehlgeschlagen.', 'Impossible de vérifier les mises à jour.', 'No se pudieron buscar actualizaciones.', 'Impossibile verificare gli aggiornamenti.', 'Не удалось проверить обновления.', '无法检查更新。', 'अपडेट जाँच नहीं हो सकी।'],
+  'Güncelle': ['Update', 'Aktualisieren', 'Mettre à jour', 'Actualizar', 'Aggiorna', 'Обновить', '更新', 'अपडेट करें'],
+  'Daha sonra': ['Later', 'Später', 'Plus tard', 'Más tarde', 'Più tardi', 'Позже', '稍后', 'बाद में'],
+  'İndir ve kur': ['Download and install', 'Herunterladen und installieren', 'Télécharger et installer', 'Descargar e instalar', 'Scarica e installa', 'Скачать и установить', '下载并安装', 'डाउनलोड करें और इंस्टॉल करें'],
+  'İndirme sayfasını aç': ['Open download page', 'Downloadseite öffnen', 'Ouvrir la page de téléchargement', 'Abrir página de descarga', 'Apri pagina di download', 'Открыть страницу загрузки', '打开下载页面', 'डाउनलोड पेज खोलें'],
+  'Kurulum başlatılıyor…': ['Starting installer…', 'Installation wird gestartet…', 'Lancement de l’installation…', 'Iniciando instalación…', 'Avvio installazione…', 'Запуск установки…', '正在启动安装…', 'इंस्टॉलर शुरू हो रहा है…'],
+  'Güncelleme indirilemedi.': ['The update could not be downloaded.', 'Update konnte nicht geladen werden.', 'Impossible de télécharger la mise à jour.', 'No se pudo descargar la actualización.', 'Impossibile scaricare l’aggiornamento.', 'Не удалось скачать обновление.', '无法下载更新。', 'अपडेट डाउनलोड नहीं हो सका।'],
+  'Yenilikler': ['What’s new', 'Neuerungen', 'Nouveautés', 'Novedades', 'Novità', 'Что нового', '更新内容', 'नया क्या है'],
+  'Mini oynatıcı': ['Mini player', 'Mini-Player', 'Mini-lecteur', 'Minirreproductor', 'Mini player', 'Мини-плеер', '迷你播放器', 'मिनी प्लेयर'],
+  'Mini oynatıcı (P)': ['Mini player (P)', 'Mini-Player (P)', 'Mini-lecteur (P)', 'Minirreproductor (P)', 'Mini player (P)', 'Мини-плеер (P)', '迷你播放器 (P)', 'मिनी प्लेयर (P)'],
   'Bölüm': ['Episode', 'Folge', 'Épisode', 'Episodio', 'Episodio', 'Серия', '集', 'एपिसोड']
 };
 
@@ -334,6 +347,9 @@ const RULES = [
   [/^Altyazı (\d+)$/, ['Subtitle {1}', 'Untertitel {1}', 'Sous-titre {1}', 'Subtítulo {1}', 'Sottotitolo {1}', 'Субтитры {1}', '字幕 {1}', 'सबटाइटल {1}']],
   [/^Seviye (\d+)$/, ['Level {1}', 'Stufe {1}', 'Niveau {1}', 'Nivel {1}', 'Livello {1}', 'Уровень {1}', '级别 {1}', 'स्तर {1}']],
   [/^"(.*)" profili silinsin mi\?$/, ['Delete the profile “{1}”?', 'Profil „{1}“ löschen?', 'Supprimer le profil « {1} » ?', '¿Eliminar el perfil «{1}»?', 'Eliminare il profilo “{1}”?', 'Удалить профиль «{1}»?', '删除配置“{1}”？', 'प्रोफ़ाइल “{1}” हटाएँ?']],
+  [/^Yeni sürüm: (.*)$/, ['New version: {1}', 'Neue Version: {1}', 'Nouvelle version : {1}', 'Nueva versión: {1}', 'Nuova versione: {1}', 'Новая версия: {1}', '新版本：{1}', 'नया संस्करण: {1}']],
+  [/^Sürüm (.*)$/, ['Version {1}', 'Version {1}', 'Version {1}', 'Versión {1}', 'Versione {1}', 'Версия {1}', '版本 {1}', 'संस्करण {1}']],
+  [/^İndiriliyor… %(\d+)$/, ['Downloading… {1}%', 'Wird geladen… {1} %', 'Téléchargement… {1} %', 'Descargando… {1} %', 'Download… {1}%', 'Загрузка… {1}%', '正在下载… {1}%', 'डाउनलोड हो रहा है… {1}%']],
   [/^Renk (.*)$/, ['Colour {1}', 'Farbe {1}', 'Couleur {1}', 'Color {1}', 'Colore {1}', 'Цвет {1}', '颜色 {1}', 'रंग {1}']]
 ];
 // Metnin içinde geçen parçalar (yayın akışı, süreler, bölüm adları)

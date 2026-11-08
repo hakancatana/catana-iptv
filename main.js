@@ -1,5 +1,7 @@
-const { app, BrowserWindow, Menu, shell, ipcMain, safeStorage, powerSaveBlocker } = require('electron');
+const { app, BrowserWindow, Menu, shell, ipcMain, safeStorage, powerSaveBlocker, net } = require('electron');
 const path = require('path');
+const fs = require('fs');
+const { spawn } = require('child_process');
 
 // Donanım destekliyse HEVC (H.265) çözmeyi aç — bazı 4K kanallar HEVC yayınlıyor.
 app.commandLine.appendSwitch('enable-features', 'PlatformHEVCDecoderSupport');
@@ -25,6 +27,30 @@ let blocker = null;
 ipcMain.on('power:keepAwake', (e, on) => {
   if (on && blocker === null) blocker = powerSaveBlocker.start('prevent-display-sleep');
   if (!on && blocker !== null) { powerSaveBlocker.stop(blocker); blocker = null; }
+});
+
+// ---- güncelleme: Windows kurulum dosyasını indir, çalıştır, uygulamayı kapat
+ipcMain.handle('update:install', async (e, url) => {
+  if (process.platform !== 'win32' || !/^https:\/\/github\.com\/hakancatana\/catana-iptv\/releases\/download\//.test(String(url))) throw new Error('bad url');
+  const res = await net.fetch(url);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const total = +res.headers.get('content-length') || 0;
+  const file = path.join(app.getPath('temp'), 'Catana-IPTV-Setup.exe');
+  const out = fs.createWriteStream(file);
+  const reader = res.body.getReader();
+  let got = 0, last = -1;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    got += value.length;
+    if (!out.write(Buffer.from(value))) await new Promise((r) => out.once('drain', r));
+    const pct = total ? Math.floor(got / total * 100) : 0;
+    if (pct !== last) { last = pct; e.sender.send('update:progress', pct); }
+  }
+  await new Promise((r) => out.end(r));
+  spawn(file, [], { detached: true, stdio: 'ignore' }).unref();
+  setTimeout(() => app.quit(), 800);
+  return true;
 });
 
 ipcMain.on('shell:open', (e, url) => { if (/^https?:\/\//i.test(String(url))) shell.openExternal(url); });

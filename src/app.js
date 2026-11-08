@@ -217,7 +217,8 @@ async function shortEpg(streamId, limit = 8) {
 
 // ---------------------------------------------------------------- öğe modelleri
 const mapLive = (s) => ({ type: 'live', id: s.stream_id, name: s.name, icon: s.stream_icon, num: s.num, cat: s.category_id });
-const mapVod = (m) => ({ type: 'vod', id: m.stream_id, name: m.name, icon: m.stream_icon, ext: m.container_extension || 'mp4', rating: m.rating, added: +m.added || 0, cat: m.category_id });
+const yearOf = (m) => String(m.year || m.releaseDate || m.release_date || '').slice(0, 4).replace(/\D/g, '') || (String(m.name || '').match(/[(\[\s-]((?:19|20)\d{2})[)\]]?\s*$/) || [])[1] || '';
+const mapVod = (m) => ({ type: 'vod', id: m.stream_id, name: m.name, icon: m.stream_icon, ext: m.container_extension || 'mp4', rating: m.rating, added: +m.added || 0, year: yearOf(m), cat: m.category_id });
 const mapSeries = (s) => ({ type: 'series', id: s.series_id, name: s.name, icon: s.cover, rating: s.rating, added: +(s.last_modified || 0), year: s.releaseDate || s.release_date || '', cat: s.category_id });
 const MAP = { live: mapLive, vod: mapVod, series: mapSeries };
 const inCat = (raw, c) => String(raw.category_id) === c || arr(raw.category_ids).map(String).includes(c);
@@ -284,7 +285,7 @@ function liveRow(it, i, g, active) {
     ${q ? `<span class="qtag">${q}</span>` : ''}</button>`;
 }
 function poster(it, i, g, extra = {}) {
-  const meta = it.type === 'series' ? (it.year ? String(it.year).slice(0, 4) : 'Dizi') : extra.meta || (it.added ? new Date(it.added * 1000).toLocaleDateString(DATE_LOC) : '');
+  const meta = extra.meta || (it.year ? String(it.year).slice(0, 4) : it.type === 'series' ? 'Dizi' : '');
   const r = parseFloat(it.rating);
   const act = extra.act || (it.type === 'series' ? 'series' : it.type === 'vod' ? 'vod' : 'play');
   return `<button type="button" class="poster" data-act="${act}" data-g="${g}" data-i="${i}" title="${esc(it.name)}">
@@ -569,6 +570,9 @@ function renderSettings() {
       ${radios('liveView', [['grid', 'Logo ızgarası'], ['list', 'Liste + önizleme']], st.liveView)}</div>
     <div class="set-card"><h3>Vurgu rengi</h3>
       <div class="swatches">${['#F2B33D', '#5B8CFF', '#3DD68C', '#FF7A59'].map((c) => `<button type="button" class="swatch ${c === st.accent ? 'active' : ''}" style="background:${c}" data-act="accent" data-id="${c}" aria-label="Renk ${c}"></button>`).join('')}</div></div>
+    <div class="set-card"><h3>Güncellemeler</h3>
+      <p>${esc('Sürüm ' + APP_VER)}</p>
+      <div class="actions"><button type="button" class="btn ghost small" data-act="update-check">Güncellemeleri denetle</button></div></div>
     <div class="set-card"><h3>Profil ve veriler</h3>
       <p>Aktif profil: <strong>${esc(profile()?.name || '')}</strong> — ${esc(profile()?.server || '')}</p>
       <div class="actions"><button type="button" class="btn ghost small" data-act="profiles">Profilleri yönet</button>
@@ -1262,6 +1266,7 @@ function closePlayer() {
   if (it && it.type !== 'live') savePos(it, video.currentTime, video.duration);
   player.classList.add('hidden');
   P.ctx = null;
+  if (document.pictureInPictureElement) { parkVideo(); if (S.section === 'vod' || S.section === 'recent' || S.section === 'home' || (S.section === 'series' && S.seriesOpen)) render(); return; }
   const stage = $('#previewStage');
   if (stage && S.section === 'live' && S.settings.liveView === 'list' && it && it.type === 'live') {
     S.selLive = it;
@@ -1388,6 +1393,20 @@ $('#pPrev').addEventListener('click', () => step(-1));
 $('#pNext').addEventListener('click', () => step(1));
 $('#pFull').addEventListener('click', toggleFs);
 $('#pChannels').addEventListener('click', () => toggleSide());
+// Mini oynatıcı (resim içinde resim): uygulama kapansa da küçük pencerede oynamaya devam eder
+async function togglePip() {
+  try {
+    if (document.pictureInPictureElement) await document.exitPictureInPicture();
+    else if (document.pictureInPictureEnabled && video.readyState >= 1) await video.requestPictureInPicture();
+  } catch (e) { toast(e.message, true); }
+}
+$('#pPip').addEventListener('click', togglePip);
+video.addEventListener('enterpictureinpicture', () => $('#pPip').classList.add('on'));
+video.addEventListener('leavepictureinpicture', () => {
+  $('#pPip').classList.remove('on');
+  // oynatıcı ekranı kapalıysa ve önizleme de göstermiyorsa yayını durdur
+  setTimeout(() => { if (!playerOpen() && videoWrap.parentElement === document.body) Engine.stop(); }, 0);
+});
 $('#pSettings').addEventListener('click', () => (Menu.isOpen() ? Menu.close() : Menu.open()));
 $('#pMute').addEventListener('click', () => { S.settings.muted = !video.muted; video.muted = S.settings.muted; saveSettings(); });
 $('#pVolume').addEventListener('input', (e) => setVolume(+e.target.value));
@@ -1629,6 +1648,7 @@ view.addEventListener('click', async (e) => {
   if (act === 'accent') { S.settings.accent = el.dataset.id; saveSettings(); applyAccent(); render(); return; }
   if (act === 'profiles') { showLogin(true); return; }
   if (act === 'reload-all') { refreshAll(); return; }
+  if (act === 'update-check') { el.disabled = true; await checkUpdate(true); el.disabled = false; return; }
   if (act === 'lang-save') {
     const pick = $('input[name=langPick]:checked'); if (!pick) return;
     S.settings.lang = pick.value; saveSettings();
@@ -1724,6 +1744,7 @@ document.addEventListener('keydown', (e) => {
     else if (k === 'ArrowLeft') { if (P.ctx.item.type === 'live') Engine.seekLive(video.currentTime - 10); else video.currentTime -= 10; updateProgress(); }
     else if ((k === 'l' || k === 'L') && P.ctx.item.type === 'live') { Engine.goLive(); updateProgress(); }
     else if (k === 'Backspace') { e.preventDefault(); prevChannel(); }
+    else if (k === 'p' || k === 'P') togglePip();
     else if (k === 'f' || k === 'F') toggleFs();
     else if (k === 'm' || k === 'M') $('#pMute').click();
     else if (k === 's' || k === 'S') Menu.isOpen() ? Menu.close() : Menu.open();
@@ -1843,9 +1864,50 @@ async function connect(p, save) {
   await setSection('home', { force: !S.cache.vod });
 }
 
+// ---------------------------------------------------------------- güncelleme
+const REPO = 'hakancatana/catana-iptv';
+const APP_VER = (NATIVE && NATIVE.versions.app) || '0.0.0';
+const cmpVer = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0); } return 0; };
+async function checkUpdate(manual) {
+  try {
+    const r = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { Accept: 'application/vnd.github+json' }, cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const rel = await r.json();
+    const latest = String(rel.tag_name || '').replace(/^v/i, '');
+    LS.set('catana.updateChecked', Date.now());
+    if (latest && cmpVer(latest, APP_VER) > 0) {
+      const exe = arr(rel.assets).find((a) => /Setup.*\.exe$/i.test(a.name));
+      S.update = { version: latest, page: rel.html_url, exe: exe ? exe.browser_download_url : '', notes: String(rel.body || '') };
+      const b = $('#updateBox'); b.classList.remove('hidden');
+      b.innerHTML = `<strong>${esc(t('Yeni sürüm: ' + latest))}</strong><span>${esc(t('Güncelle'))} ›</span>`;
+      if (manual) openUpdate();
+    } else if (manual) toast(t('Uygulama güncel.') + ' (' + APP_VER + ')');
+  } catch (e) { if (manual) toast(t('Güncelleme denetlenemedi.'), true); }
+}
+function openUpdate() {
+  const u = S.update; if (!u) return;
+  const canInstall = NATIVE && NATIVE.platform === 'win32' && u.exe;
+  const notes = u.notes.replace(/[#*`|>]/g, '').replace(/\n{3,}/g, '\n\n').trim().slice(0, 700);
+  openModal(`<h3>${esc('Yeni sürüm: ' + u.version)}</h3><div class="muted small">${esc('Sürüm ' + APP_VER)} → ${esc(u.version)}</div>
+    ${notes ? `<div class="m-sub" style="padding:4px 0 0">Yenilikler</div><p class="muted small" style="white-space:pre-line">${esc(notes)}</p>` : ''}
+    <p class="form-msg" id="updMsg"></p>
+    <div class="actions"><button type="button" class="btn primary" id="updGo">${canInstall ? 'İndir ve kur' : 'İndirme sayfasını aç'}</button><button type="button" class="btn ghost" id="updLater">Daha sonra</button></div>`);
+  $('#updLater').onclick = closeModal;
+  $('#updGo').onclick = async () => {
+    if (!canInstall) { NATIVE ? NATIVE.openExternal(u.page) : window.open(u.page); closeModal(); return; }
+    $('#updGo').disabled = true; $('#updLater').disabled = true;
+    $('#updMsg').textContent = t('İndiriliyor… %0');
+    NATIVE.onUpdateProgress((p) => { const m = $('#updMsg'); if (m) m.textContent = t('İndiriliyor… %' + p); });
+    try { await NATIVE.installUpdate(u.exe); $('#updMsg').textContent = t('Kurulum başlatılıyor…'); }
+    catch (e) { $('#updMsg').textContent = t('Güncelleme indirilemedi.'); $('#updMsg').className = 'form-msg err'; $('#updGo').disabled = false; $('#updLater').disabled = false; }
+  };
+}
+$('#updateBox').addEventListener('click', openUpdate);
+
 // ---------------------------------------------------------------- başlat
 (async function init() {
   startI18n();
+  if (Date.now() - (LS.get('catana.updateChecked', 0) || 0) > 6 * 3600 * 1000) setTimeout(() => checkUpdate(false), 5000);
   if (IS_MAC) $('.search kbd').textContent = '⌘K';
   applyAccent(); applyFit();
   $('#pVolume').value = S.settings.vol;
