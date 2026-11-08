@@ -136,4 +136,4 @@ Catana IPTV is a media player only. It does not include, host or provide any cha
 
 ## License
 
-[MIT](LICENSE) © Hakan Çatana
+[MIT](LICENSE) © Mustafa Hakan Çatana
