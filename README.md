@@ -11,7 +11,7 @@
 ![Languages](https://img.shields.io/badge/languages-9-1D222B)
 [![License](https://img.shields.io/github/license/hakancatana/catana-iptv?color=1D222B)](LICENSE)
 
-[**Download**](#download) · [Features](#features) · [Screenshots](#screenshots) · [Build from source](#build-from-source) · [Türkçe](#türkçe)
+[**Download**](#download) · [Features](#features) · [Screenshots](#screenshots) · [Build from source](#build-from-source)
 
 <img src="docs/screenshots/01-home.png" alt="Catana IPTV home screen" width="100%">
 
@@ -120,19 +120,6 @@ Built with [Electron](https://www.electronjs.org/), [mpegts.js](https://github.c
 ## Disclaimer
 
 Catana IPTV is a media player only. It does not include, host or provide any channels, playlists or other content. Use it only with services and content you are legally entitled to access.
-
-## Türkçe
-
-**Catana IPTV**, Xtream Codes için Windows ve macOS masaüstü IPTV oynatıcısıdır.
-
-- **İndir:** [Son sürüm](https://github.com/hakancatana/catana-iptv/releases/latest). Windows için `Setup.exe`, Mac için işlemcine uygun zip.
-- **Canlı TV:** Logo ızgarası ya da önizlemeli liste görünümü var. Canlı yayını 30 dakikaya kadar geri sarabilir, *CANLI* düğmesiyle en güncel ana dönebilirsin. Ayrıca tam TV rehberi var.
-- **Film ve dizi:** Anasayfada öne çıkanlar slider'ı ve *İzlemeye devam et* satırı var. Detay sayfalarında konu, oyuncular ve fragman bulunuyor. Dizilerde sezon ve bölüm listesi var.
-- **Oynatıcı:** Ses dili, altyazı, kalite, önbellek ve görüntü oranı ayarlanabiliyor, canlı istatistikler de gösteriliyor. Backspace önceki kanala döndürür.
-- **Hesap:** Birden fazla profil kaydedilebiliyor, şifreler şifreli saklanıyor. Kullanmadığın kategorileri gizleyebilir, yetişkin içeriği gizleyebilir ya da PIN ile koruyabilirsin. Cihaz analizi bölümü de var.
-- **Diller:** 9 dil desteklenir; Ayarlar › Dil.
-
-<div align="center"><img src="docs/screenshots/tr-01-home.png" alt="Catana IPTV Türkçe arayüz" width="80%"></div>
 
 ## License
 

@@ -54,6 +54,8 @@ const qualityOf = (n) => {
   if (/\bSD\b/.test(s)) return 'SD';
   return '';
 };
+// Görseli oranını bozmadan sığdır; boş kalan alanı görselin bulanık hali doldurur
+const fitAttr = (url) => (url ? ` style="--bg:url(&quot;${esc(url)}&quot;)"` : '');
 const markHtml = (name) => { const n = cleanName(name); return `<span class="mark" style="--c:${colorOf(n)}">${esc(n.length > 22 ? n.slice(0, 21) + '…' : n)}</span>`; };
 const logoHtml = (icon, name) => (icon ? `<img src="${esc(icon)}" loading="lazy" alt="" data-fb="mark" data-name="${esc(name)}">` : markHtml(name));
 
@@ -64,7 +66,11 @@ document.addEventListener('error', (e) => {
   if (t.dataset.fb === 'mark') {
     const tpl = document.createElement('template'); tpl.innerHTML = markHtml(t.dataset.name);
     t.replaceWith(tpl.content.firstElementChild);
-  } else t.remove();
+  } else {
+    const box = t.parentElement;
+    if (box && box.classList.contains('fit')) { box.classList.remove('has-img'); box.style.removeProperty('--bg'); }
+    t.remove();
+  }
 }, true);
 
 // ---------------------------------------------------------------- durum
@@ -282,7 +288,7 @@ function poster(it, i, g, extra = {}) {
   const r = parseFloat(it.rating);
   const act = extra.act || (it.type === 'series' ? 'series' : it.type === 'vod' ? 'vod' : 'play');
   return `<button type="button" class="poster" data-act="${act}" data-g="${g}" data-i="${i}" title="${esc(it.name)}">
-    <span class="poster-img">${r > 0 ? `<span class="rating">★ ${r.toFixed(1)}</span>` : ''}
+    <span class="poster-img fit${it.icon ? ' has-img' : ''}"${fitAttr(it.icon)}>${r > 0 ? `<span class="rating">★ ${r.toFixed(1)}</span>` : ''}
       <span class="fav ${isFav(it.type === 'episode' ? 'series' : it.type, it.type === 'episode' ? it.seriesId : it.id) ? 'on' : ''}" data-act="fav" data-g="${g}" data-i="${i}" title="Favori">${ICON.star}</span>
       <span class="ph">${esc(cleanName(it.name))}</span>
       ${it.icon ? `<img src="${esc(it.icon)}" loading="lazy" alt="" data-fb="poster">` : ''}
@@ -499,7 +505,7 @@ async function renderSeriesDetail() {
       ${bg ? `<div class="hero-bg ${inf.backdrop ? '' : 'blur'}" style="${bgStyle(bg)}"></div><div class="hero-shade"></div>` : ''}
       ${backBtn(backLabel('Diziler'))}
       <div class="dh-row">
-        <div class="dh-poster">${cover ? `<img src="${esc(cover)}" alt="" data-fb="poster">` : ''}</div>
+        <div class="dh-poster fit${cover ? ' has-img' : ''}"${fitAttr(cover)}>${cover ? `<img src="${esc(cover)}" alt="" data-fb="poster">` : ''}</div>
         <div class="series-info">
           <h2>${esc(s.name)}</h2>
           <div class="muted">${esc([inf.year, inf.genre, seasons.length ? seasons.length + ' sezon' : '', parseFloat(inf.rating || s.rating) > 0 ? '★ ' + parseFloat(inf.rating || s.rating).toFixed(1) : ''].filter(Boolean).join(' · '))}</div>
@@ -516,7 +522,7 @@ async function renderSeriesDetail() {
       const p = pos['episode_' + e.id];
       const cur = resume && String(resume.id) === String(e.id);
       return `<button type="button" class="episode ${cur ? 'current' : ''}" data-act="play" data-g="eps" data-i="${i}">
-        <span class="ep-thumb">${e.thumb ? `<img src="${esc(e.thumb)}" alt="" loading="lazy" data-fb="poster">` : ''}<span class="ep-no">${esc(e.num)}</span>
+        <span class="ep-thumb fit${e.thumb ? ' has-img' : ''}"${fitAttr(e.thumb)}>${e.thumb ? `<img src="${esc(e.thumb)}" alt="" loading="lazy" data-fb="poster">` : ''}<span class="ep-no">${esc(e.num)}</span>
           ${p ? `<span class="bar"><span style="width:${Math.round(p.pos / p.total * 100)}%"></span></span>` : ''}</span>
         <span class="ep-main"><span class="et">${esc(e.title)}</span>${e.plot ? `<span class="ep-plot">${esc(e.plot)}</span>` : ''}</span>
         <span class="ed">${p ? dur(p.total - p.pos) + ' kaldı' : esc(e.len)}</span></button>`;
@@ -719,7 +725,7 @@ function renderHero() {
           <button type="button" class="btn ghost" data-act="hero-detail">Detaylar</button>
         </div>
       </div>
-      <div class="hero-poster"><img src="${esc(it.icon)}" alt="" data-fb="poster"></div>
+      <div class="hero-poster fit has-img"${fitAttr(it.icon)}><img src="${esc(it.icon)}" alt="" data-fb="poster"></div>
     </div>
     <button type="button" class="hero-nav prev" data-act="hero-step" data-id="-1" aria-label="Önceki">${ICON.back}</button>
     <button type="button" class="hero-nav next" data-act="hero-step" data-id="1" aria-label="Sonraki"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
@@ -751,7 +757,7 @@ async function renderVodDetail() {
   $('#vd').innerHTML = `<div class="detail-hero">${vbg ? `<div class="hero-bg ${inf.backdrop ? '' : 'blur'}" style="${bgStyle(vbg)}"></div><div class="hero-shade"></div>` : ''}
     ${backBtn(backLabel('Filmler'))}
     <div class="dh-row">
-      <div class="dh-poster">${cover ? `<img src="${esc(cover)}" alt="" data-fb="poster">` : ''}</div>
+      <div class="dh-poster fit${cover ? ' has-img' : ''}"${fitAttr(cover)}>${cover ? `<img src="${esc(cover)}" alt="" data-fb="poster">` : ''}</div>
       <div class="series-info">
         <h2>${esc(m.name)}</h2>
         <div class="muted">${esc(metaLine(inf, m))}</div>
