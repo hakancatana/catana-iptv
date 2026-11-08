@@ -125,11 +125,10 @@ Built with [Electron](https://www.electronjs.org/), [mpegts.js](https://github.c
 
 ## Releasing
 
-Bump `version` in `package.json`, then push a tag — GitHub Actions builds the Windows and macOS packages and publishes the release:
+1. Bump `version` in `package.json` and push to `main`.
+2. Go to **Actions → Release → Run workflow**.
 
-```bash
-git tag v1.4.0 && git push origin v1.4.0
-```
+GitHub Actions builds the Windows installer and the macOS packages, creates the `v<version>` tag and publishes the release. Installed apps pick up the new version automatically.
 
 ## Disclaimer
 
