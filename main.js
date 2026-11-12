@@ -62,6 +62,13 @@ ipcMain.handle('update:install', async (e, url) => {
 
 ipcMain.on('win:fullscreen', (e, on) => { const w = BrowserWindow.fromWebContents(e.sender); if (w) w.setFullScreen(!!on); });
 
+ipcMain.on('win:ctl', (e, cmd) => {
+  const w = BrowserWindow.fromWebContents(e.sender); if (!w) return;
+  if (cmd === 'min') w.minimize();
+  else if (cmd === 'max') { if (w.isMaximized()) w.unmaximize(); else w.maximize(); }
+  else if (cmd === 'close') w.close();
+});
+
 ipcMain.on('shell:open', (e, url) => { if (/^https?:\/\//i.test(String(url))) shell.openExternal(url); });
 
 function createWindow() {
@@ -74,6 +81,8 @@ function createWindow() {
     title: 'Catana IPTV',
     icon: path.join(__dirname, 'src', 'icon.png'),
     autoHideMenuBar: true,
+    // Windows/Linux: sistem çubuğu yerine temaya uygun kendi düğmelerimiz; macOS: yerel trafik ışıkları uygulamanın içinde
+    ...(isMac ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 16, y: 18 } } : { frame: false }),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       // Xtream sunucuları CORS başlığı göndermez; masaüstü uygulamada bu kontrolü kapatıyoruz.
@@ -83,6 +92,9 @@ function createWindow() {
     }
   });
   win.loadFile(path.join(__dirname, 'src', 'index.html'));
+  const sendState = () => { if (!win.isDestroyed()) win.webContents.send('win:state', win.isFullScreen() ? 'fullscreen' : win.isMaximized() ? 'maximized' : 'normal'); };
+  ['maximize', 'unmaximize', 'enter-full-screen', 'leave-full-screen'].forEach((ev) => win.on(ev, sendState));
+  win.webContents.on('did-finish-load', sendState);
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//i.test(url)) shell.openExternal(url);
     return { action: 'deny' };

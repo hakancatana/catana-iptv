@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.6.1
+- Themed window controls on Windows and Linux (minimize, maximize, close) instead of the system title bar
+- macOS: native window buttons sit inside the app
+
 ## 1.6.0
 - **M3U playlists** as a second profile type next to Xtream Codes
 - **Multi-View**: watch 2 or 4 channels at once

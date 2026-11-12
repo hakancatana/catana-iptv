@@ -81,6 +81,19 @@ const IS_LINUX = !!(NATIVE && NATIVE.platform === 'linux');
 const ENC_NAME = IS_MAC ? 'macOS Anahtar Zinciri' : IS_LINUX ? 'Linux anahtar zinciri' : 'Windows DPAPI';
 const ENC_USER = IS_MAC ? 'bu Mac kullanıcısı' : IS_LINUX ? 'bu Linux kullanıcısı' : 'bu Windows kullanıcısı';
 if (IS_MAC) document.documentElement.classList.add('mac');
+// Çerçevesiz pencere (Windows/Linux): kendi küçült/büyüt/kapat düğmelerimiz
+if (NATIVE && NATIVE.winCtl && !IS_MAC) {
+  const root = document.documentElement, bar = document.getElementById('winbar');
+  root.classList.add('frameless');
+  bar.classList.remove('hidden');
+  bar.addEventListener('click', (e) => { const b = e.target.closest('[data-win]'); if (b) NATIVE.winCtl(b.dataset.win); });
+  NATIVE.onWinState((st) => {
+    root.classList.toggle('win-max', st === 'maximized');
+    root.classList.toggle('win-fs', st === 'fullscreen');
+    const m = bar.querySelector('[data-win="max"]'), label = st === 'maximized' ? 'Önceki boyut' : 'Büyüt';
+    m.title = label; m.setAttribute('aria-label', label);
+  });
+}
 // Şifreler diske Windows şifrelemesiyle (DPAPI) yazılır; bellekte çözülmüş tutulur.
 function loadProfiles() {
   let migrate = false;
