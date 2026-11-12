@@ -534,3 +534,7 @@ html.frameless .drag-strip, html.mac .drag-strip { display: block; position: fix
 .topbar h1 { -webkit-app-region: drag; }
 html:fullscreen .p-top, html.win-fs .p-top { padding-right: 24px; }
 html.win-fs .topbar { padding-right: 24px; }
+#hero { cursor: grab; touch-action: pan-y; user-select: none; }
+#hero.dragging { cursor: grabbing; }
+#hero img { -webkit-user-drag: none; }
+#hero .btn, #hero .hero-nav, #hero .hero-dots button { cursor: pointer; }

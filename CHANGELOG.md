@@ -2,6 +2,7 @@
 
 ## 1.6.3
 - Home slider: more space around the previous/next arrows
+- Home slider: drag with the mouse to move between slides
 
 ## 1.6.2
 - Window controls line up with the search bar and match its height and style

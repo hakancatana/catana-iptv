@@ -797,7 +797,40 @@ function renderHome() {
     rowHtml('Son güncellenen diziler', ls.map((x, i) => poster(x, i, 'hs')), 'series');
   view.innerHTML = `<div class="scroll" id="scroll">${S.hero.length ? '<section class="hero" id="hero"></section>' : ''}
     <div class="pad" style="padding-top:26px">${rows || '<div class="empty">Henüz içerik yok.</div>'}</div></div>`;
-  if (S.hero.length) { renderHero(); startHeroTimer(); }
+  if (S.hero.length) { renderHero(); startHeroTimer(); heroDrag($('#hero')); }
+}
+// Slider'ı fareyle basılı tutup sürükleyerek kaydırma
+function heroDrag(box) {
+  let x0 = null, dx = 0, moved = false;
+  const content = () => box.querySelector('.hero-content');
+  box.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 || e.target.closest('.hero-nav, .hero-dots')) return;
+    x0 = e.clientX; dx = 0; moved = false;
+  });
+  box.addEventListener('pointermove', (e) => {
+    if (x0 === null) return;
+    dx = e.clientX - x0;
+    if (!moved && Math.abs(dx) > 6) { moved = true; box.setPointerCapture(e.pointerId); box.classList.add('dragging'); clearInterval(S.heroTimer); }
+    if (moved) { const c = content(); c.style.transform = `translateX(${dx}px)`; c.style.opacity = String(1 - Math.min(Math.abs(dx) / 600, .5)); }
+  });
+  const end = () => {
+    if (x0 === null) return;
+    x0 = null; box.classList.remove('dragging');
+    if (!moved) return;
+    const c = content();
+    if (Math.abs(dx) > 70) {
+      heroStep(dx < 0 ? 1 : -1);
+      content().animate([{ transform: `translateX(${dx < 0 ? 60 : -60}px)`, opacity: .3 }, { transform: 'none', opacity: 1 }], { duration: 260, easing: 'ease-out' });
+    } else {
+      c.animate([{ transform: `translateX(${dx}px)` }, { transform: 'none' }], { duration: 200, easing: 'ease-out' });
+      c.style.transform = ''; c.style.opacity = '';
+      startHeroTimer();
+    }
+  };
+  box.addEventListener('pointerup', end);
+  box.addEventListener('pointercancel', end);
+  // Sürükleme bitince altta kalan düğmeye yanlışlıkla tıklanmasın
+  box.addEventListener('click', (e) => { if (moved) { e.stopPropagation(); e.preventDefault(); moved = false; } }, true);
 }
 function renderHero() {
   const box = $('#hero'); if (!box) return;
