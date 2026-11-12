@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.6.2
+- Window controls line up with the search bar and match its height and style
+
 ## 1.6.1
 - Themed window controls on Windows and Linux (minimize, maximize, close) instead of the system title bar
 - macOS: native window buttons sit inside the app
