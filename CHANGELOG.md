@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.6.3
+## 1.6.4
 - Home slider: more space around the previous/next arrows
 - Home slider: drag with the mouse to move between slides
 

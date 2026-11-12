@@ -1,7 +1,7 @@
 {
   "name": "catana-iptv",
   "productName": "Catana IPTV",
-  "version": "1.6.3",
+  "version": "1.6.4",
   "description": "Catana IPTV — Xtream Codes desktop player",
   "main": "main.js",
   "author": {
