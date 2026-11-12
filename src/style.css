@@ -330,7 +330,7 @@ body > .video-wrap { display: none; }
 .hero-bg { position: absolute; inset: 0; background-size: cover; background-position: center 25%; transition: opacity .6s; }
 .hero-bg.blur { filter: blur(28px) brightness(.55); transform: scale(1.15); }
 .hero-shade { position: absolute; inset: 0; background: linear-gradient(90deg, #0E1014 0%, #0E1014E6 32%, #0E101480 60%, #0E101420 100%), linear-gradient(0deg, #0E1014 0%, #0E101400 40%); }
-.hero-content { position: absolute; left: 0; right: 0; bottom: 0; top: 0; display: flex; align-items: center; gap: 40px; padding: 40px 56px; }
+.hero-content { position: absolute; left: 0; right: 0; bottom: 0; top: 0; display: flex; align-items: center; gap: 40px; padding: 40px 124px; }
 .hero-text { flex: 1; min-width: 0; max-width: 640px; display: flex; flex-direction: column; gap: 14px; }
 .hero-tag { align-self: flex-start; padding: 4px 10px; border-radius: 6px; background: var(--accent); color: var(--on-accent); font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .hero-title { margin: 0; font-family: "Space Grotesk", Inter, sans-serif; font-size: 42px; line-height: 1.08; font-weight: 700; }
@@ -341,8 +341,8 @@ body > .video-wrap { display: none; }
 .hero-poster img { width: 100%; height: 100%; object-fit: cover; }
 .hero-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; border-radius: 22px; border: 1px solid #ffffff26; background: #0E1014B0; color: #fff; display: flex; align-items: center; justify-content: center; z-index: 2; }
 .hero-nav:hover { background: #1D222B; }
-.hero-nav.prev { left: 10px; } .hero-nav.next { right: 10px; }
-.hero-dots { position: absolute; left: 56px; bottom: 22px; display: flex; gap: 8px; z-index: 2; }
+.hero-nav.prev { left: 36px; } .hero-nav.next { right: 36px; }
+.hero-dots { position: absolute; left: 124px; bottom: 22px; display: flex; gap: 8px; z-index: 2; }
 .hero-dots button { width: 22px; height: 6px; border-radius: 3px; border: 0; padding: 0; background: #ffffff40; }
 .hero-dots button.active { width: 36px; background: var(--accent); }
 .hrow { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 28px; scroll-behavior: smooth; }

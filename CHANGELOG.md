@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.6.3
+- Home slider: more space around the previous/next arrows
+
 ## 1.6.2
 - Window controls line up with the search bar and match its height and style
 
