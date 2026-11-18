@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.6.5
+- Live TV buffers much less on unstable connections: after a stall the player builds up a few seconds of reserve before resuming, instead of resuming right away and stalling again
+- Catching up to live no longer jumps ahead and empties the buffer; the player speeds up slightly (8%) instead
+- Larger live buffer on every buffer setting, and in Multi-View
+
 ## 1.6.4
 - Home slider: more space around the previous/next arrows
 - Home slider: drag with the mouse to move between slides

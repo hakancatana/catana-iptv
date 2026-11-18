@@ -1186,14 +1186,14 @@ class CellPlayer {
       const go = () => { const p = this.v.play(); if (p && p.catch) p.catch(() => {}); };
       if (c.type === 'hls') {
         if (!window.Hls || !Hls.isSupported()) return fail();
-        this.h = new Hls({ enableWorker: true, maxBufferLength: 10, liveSyncDurationCount: 2 });
+        this.h = new Hls({ enableWorker: true, maxBufferLength: 20, liveSyncDurationCount: 3 });
         this.h.on(Hls.Events.ERROR, (e, d) => { if (d.fatal) fail(); });
         this.h.on(Hls.Events.MANIFEST_PARSED, go);
         this.h.loadSource(c.url); this.h.attachMedia(this.v);
       } else if (c.type === 'ts' || c.type === 'tsvod') {
         if (!window.mpegts || !mpegts.getFeatureList().mseLivePlayback) return fail();
         this.t = mpegts.createPlayer({ type: 'mpegts', isLive: item.type === 'live', url: c.url },
-          { enableWorker: true, enableStashBuffer: false, liveBufferLatencyChasing: true, liveBufferLatencyMaxLatency: 3, liveBufferLatencyMinRemain: 1, autoCleanupSourceBuffer: true });
+          { enableWorker: true, enableStashBuffer: true, stashInitialSize: 256 * 1024, liveBufferLatencyChasing: true, liveBufferLatencyMaxLatency: 15, liveBufferLatencyMinRemain: 6, autoCleanupSourceBuffer: true });
         this.t.on(mpegts.Events.ERROR, fail);
         this.t.attachMediaElement(this.v); this.t.load(); go();
       } else { this.v.onerror = fail; this.v.src = c.url; go(); }
@@ -1272,12 +1272,14 @@ const video = $('#video');
 const videoWrap = $('#videoWrap');
 function parkVideo() { if (videoWrap.parentElement !== document.body) document.body.appendChild(videoWrap); }
 
-// lat: canlı yayının ne kadar gerisinden izleneceği (sn). max aşılırsa canlıya geri yaklaşılır.
+// lat: canlı yayında elde tutulan pay (sn). target: hedeflenen pay, max: aşılırsa hafifçe hızlanarak canlıya yaklaşılır.
+// start: ilk açılışta oynatmadan önce biriktirilen süre (açılışı fazla geciktirmemek için kısa tutulur).
 const BUFFER = {
-  low: { label: 'Az', ts: { enableStashBuffer: false }, lat: { max: 2.5, min: 1 }, hls: { maxBufferLength: 10, liveSyncDurationCount: 2 } },
-  normal: { label: 'Normal', ts: { enableStashBuffer: true, stashInitialSize: 384 * 1024 }, lat: { max: 6, min: 2.5 }, hls: { maxBufferLength: 30, liveSyncDurationCount: 3 } },
-  high: { label: 'Fazla', ts: { enableStashBuffer: true, stashInitialSize: 1024 * 1024 }, lat: { max: 20, min: 8 }, hls: { maxBufferLength: 60, liveSyncDurationCount: 5 } }
+  low: { label: 'Az', ts: { enableStashBuffer: true, stashInitialSize: 128 * 1024 }, lat: { start: 1, target: 3, max: 8 }, hls: { maxBufferLength: 20, liveSyncDurationCount: 2 } },
+  normal: { label: 'Normal', ts: { enableStashBuffer: true, stashInitialSize: 384 * 1024 }, lat: { start: 2, target: 8, max: 20 }, hls: { maxBufferLength: 30, liveSyncDurationCount: 3 } },
+  high: { label: 'Fazla', ts: { enableStashBuffer: true, stashInitialSize: 1024 * 1024 }, lat: { start: 4, target: 20, max: 45 }, hls: { maxBufferLength: 60, liveSyncDurationCount: 5 } }
 };
+const bufCfg = () => BUFFER[S.settings.buffer] || BUFFER.normal;
 const DVR_SECONDS = 30 * 60; // canlı yayında geri sarılabilecek süre
 
 function candidates(item) {
@@ -1319,6 +1321,7 @@ const Engine = {
   },
   teardown() {
     clearTimeout(this.startTimer); clearTimeout(this.stallTimer);
+    this.endHold(false); video.playbackRate = 1;
     if (this.hls) { try { this.hls.destroy(); } catch { /* */ } this.hls = null; }
     if (this.ts) { try { this.ts.pause(); this.ts.unload(); this.ts.detachMediaElement(); this.ts.destroy(); } catch { /* */ } this.ts = null; }
     video.onerror = null;
@@ -1335,6 +1338,7 @@ const Engine = {
     this.idx = 0;
     this.startAt = startAt || 0;
     this.follow = true;   // canlı yayında en güncel noktayı takip et
+    video.playbackRate = 1; this.stalls = 0;
     addRecent(item);
     this.tryNext();
   },
@@ -1349,7 +1353,38 @@ const Engine = {
   },
   behind() { const r = this.liveRange(); return r ? Math.max(0, r.edge - video.currentTime) : 0; },
   atLive() { return this.follow && this.behind() < this.latMax() + 4; },
-  latMax() { return (BUFFER[S.settings.buffer] || BUFFER.normal).lat.max + (this.hls ? 10 : 0); },
+  latMax() { return bufCfg().lat.max + (this.hls ? 10 : 0); },
+  latTarget() { return bufCfg().lat.target + (this.hls ? 6 : 0); },
+  // oynatma noktasının önünde hazır bekleyen süre
+  ahead() {
+    const b = video.buffered, t = video.currentTime;
+    for (let i = 0; i < b.length; i++) if (b.end(i) > t) return b.end(i) - Math.max(t, b.start(i));
+    return 0;
+  },
+  // Canlı yayın takılınca hemen kaldığı yerden devam etmek yerine biraz pay biriktir;
+  // aksi halde her küçük ağ dalgalanmasında yeniden takılır.
+  startHold(goal, maxWait) {
+    if (!this.item || this.item.type !== 'live' || this.holding) return;
+    this.holding = true; this.holdGoal = goal; this.holdUntil = Date.now() + maxWait;
+    if (!video.paused) video.pause();
+    clearInterval(this.holdTimer);
+    this.holdTimer = setInterval(() => this.checkHold(), 250);
+  },
+  checkHold() {
+    if (!this.holding) return;
+    const a = this.ahead();
+    if (a >= this.holdGoal || (Date.now() > this.holdUntil && a > 0.5)) this.endHold(true);
+  },
+  endHold(play) {
+    clearInterval(this.holdTimer);
+    if (!this.holding) return;
+    this.holding = false;
+    if (!play) return;
+    // yayın zamanı 0'dan başlamıyorsa (sık görülür) ilk hazır noktaya geç
+    const b = video.buffered, t = video.currentTime;
+    for (let i = 0; i < b.length; i++) if (b.end(i) > t) { if (b.start(i) > t + 0.3) video.currentTime = b.start(i); break; }
+    const p = video.play(); if (p && p.catch) p.catch(() => {});
+  },
   seekLive(t) {
     const r = this.liveRange(); if (!r) return;
     t = Math.max(r.start + 0.2, Math.min(r.edge, t));
@@ -1359,14 +1394,18 @@ const Engine = {
   goLive() {
     const r = this.liveRange(); if (!r) return;
     this.follow = true;
-    video.currentTime = Math.max(r.start, r.edge - (BUFFER[S.settings.buffer] || BUFFER.normal).lat.min);
+    video.currentTime = Math.max(r.start, r.edge - this.latTarget());
     if (video.paused) { const p = video.play(); if (p && p.catch) p.catch(() => {}); }
   },
-  // canlıyı takip ederken gecikme büyürse öne atla (mpegts.js'in kendi takibi kapalı; geri sarmaya izin vermek için)
+  // canlıyı takip ederken gecikme büyürse atlamadan, %8 hızlanarak yaklaş (atlamak tamponu boşaltıp yeni takılmalara yol açıyordu).
+  // Çok geride kalındıysa (ör. uzun kopma) yine öne atlanır. mpegts.js'in kendi takibi kapalı; geri sarmaya izin vermek için.
   chase() {
-    if (!this.item || this.item.type !== 'live' || !this.follow || video.paused || video.seeking) return;
+    if (!this.item || this.item.type !== 'live' || !this.follow || video.paused || video.seeking) { if (video.playbackRate !== 1 && !this.follow) video.playbackRate = 1; return; }
     const r = this.liveRange(); if (!r) return;
-    if (r.edge - video.currentTime > this.latMax()) video.currentTime = Math.max(r.start, r.edge - (BUFFER[S.settings.buffer] || BUFFER.normal).lat.min);
+    const behind = r.edge - video.currentTime;
+    if (behind > this.latMax() * 3) { video.playbackRate = 1; video.currentTime = Math.max(r.start, r.edge - this.latTarget()); return; }
+    if (behind > this.latMax() && video.playbackRate === 1) video.playbackRate = 1.08;
+    else if (behind <= this.latTarget() + 1 && video.playbackRate !== 1) video.playbackRate = 1;
   },
   restart() { if (!this.item) return; const t = this.item.type === 'live' ? 0 : video.currentTime; this.play(this.item, t); },
   fail(run, why) {
@@ -1412,7 +1451,7 @@ const Engine = {
       p.on(mpegts.Events.ERROR, (type, detail) => this.fail(run, type + ' ' + detail));
       p.attachMediaElement(video);
       p.load();
-      playSafe();
+      if (live) this.startHold(buf.lat.start, 4000); else playSafe();
     } else {
       this.mode = 'Yerel oynatıcı';
       video.onerror = () => this.fail(run, 'native ' + (video.error && video.error.code));
@@ -1428,6 +1467,7 @@ const Engine = {
   onWaiting() {
     if (!this.item) return;
     this.status('loading', 'Arabelleğe alınıyor…');
+    if (this.item.type === 'live' && !video.seeking) { this.stalls = (this.stalls || 0) + 1; this.startHold(Math.min(this.latTarget(), 1 + 2 * this.stalls), 10000); }
     clearTimeout(this.stallTimer);
     const run = this.run;
     // canlı yayın 15 sn takılırsa aynı kaynağı yeniden aç
@@ -1436,7 +1476,7 @@ const Engine = {
 };
 video.addEventListener('playing', () => Engine.onPlaying());
 video.addEventListener('waiting', () => Engine.onWaiting());
-video.addEventListener('progress', () => Engine.chase());
+video.addEventListener('progress', () => { Engine.checkHold(); Engine.chase(); });
 video.addEventListener('timeupdate', () => {
   Engine.chase();
   // takılma sonrası 'playing' gelmeden akış sürerse bekleme göstergesini kapat
@@ -1533,7 +1573,7 @@ function step(d) {
 }
 function updateProgress() {
   const c = P.ctx; if (!c) return;
-  $('#pPlayIcon').innerHTML = video.paused ? ICON.play : ICON.pause;
+  $('#pPlayIcon').innerHTML = video.paused && !Engine.holding ? ICON.play : ICON.pause;
   const live = c.item.type === 'live';
   let frac = 0, a = '', b = '';
   $('#pGoLive').classList.toggle('hidden', !live);
@@ -1615,7 +1655,7 @@ function toggleSide(force) {
   $('#pChannels').classList.toggle('active', P.side);
   if (P.side) { P.sideCat = 'all'; renderSide(); }
 }
-function togglePlay() { if (!video.paused && Engine.item && Engine.item.type === 'live') Engine.follow = false; if (video.paused) { const p = video.play(); if (p && p.catch) p.catch(() => {}); } else video.pause(); updateProgress(); }
+function togglePlay() { if (Engine.holding) { Engine.endHold(false); Engine.follow = false; Engine.status('ok'); updateProgress(); return; } if (!video.paused && Engine.item && Engine.item.type === 'live') Engine.follow = false; if (video.paused) { const p = video.play(); if (p && p.catch) p.catch(() => {}); } else video.pause(); updateProgress(); }
 function toggleFs() { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); else document.documentElement.requestFullscreen().catch(() => {}); }
 function setVolume(v) { S.settings.vol = Math.max(0, Math.min(1, v)); video.volume = S.settings.vol; S.settings.muted = false; video.muted = false; $('#pVolume').value = S.settings.vol; saveSettings(); }
 function wakeUi() {
@@ -1677,7 +1717,7 @@ $('#pSideCats').addEventListener('click', (e) => {
   renderSideList();
 });
 video.addEventListener('play', updateProgress);
-video.addEventListener('pause', () => { updateProgress(); wakeUi(); });
+video.addEventListener('pause', () => { updateProgress(); if (!Engine.holding) wakeUi(); });
 function updateMuteIcon() {
   const off = video.muted || video.volume === 0;
   $('#pMute svg').innerHTML = off
